@@ -1,6 +1,6 @@
 /** FL-19: non-public Supabase Edge Function invoked only by authenticated Cron. */
 import postgres from "npm:postgres@3.4.7";
-import { allowedTarget, probe } from "./checker.ts";
+import { allowedTarget, probe, verifyPublicDns } from "./checker.ts";
 
 const respond = (status: number, body: object) =>
   new Response(JSON.stringify(body), {
@@ -17,13 +17,13 @@ function equalsSecret(a: string, b: string): boolean {
 Deno.serve(async (request) => {
   if (request.method !== "POST") return respond(405, { error: "Method not allowed" });
   const cronSecret = Deno.env.get("FLEETLUMA_CRON_SECRET") ?? "";
-  if (!equalsSecret(request.headers.get("x-fleetluma-cron") ?? "", cronSecret)) {
+  if (cronSecret.length < 32 || !equalsSecret(request.headers.get("x-fleetluma-cron") ?? "", cronSecret)) {
     return respond(401, { error: "Not authorized" });
   }
   const databaseUrl = Deno.env.get("FLEETLUMA_DB_URL") ?? "";
   const hosts = (Deno.env.get("FLEETLUMA_CHECK_ALLOWED_HOSTS") ?? "")
     .split(",").map((x) => x.trim().toLowerCase()).filter(Boolean);
-  if (!databaseUrl || hosts.length === 0) {
+  if (!databaseUrl || hosts.length === 0 || Deno.env.get("FLEETLUMA_PUBLIC_PROBES_ENABLED") !== "true") {
     return respond(503, { error: "Checker is not configured" });
   }
   const allowed = new Set(hosts);
@@ -37,7 +37,8 @@ Deno.serve(async (request) => {
     let skipped = 0;
     for (const service of services) {
       try {
-        allowedTarget(service.url, allowed);
+        const target = allowedTarget(service.url, allowed);
+        await verifyPublicDns(target);
         const result = await probe(service.url, allowed);
         await sql`INSERT INTO fleetluma.service_checks
           (service_id, checked_at, status, http_code, latency_ms, failure_kind)
