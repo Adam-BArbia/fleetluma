@@ -11,11 +11,13 @@ const _amber = Color(0xFFF6BE69);
 class FleetScreen extends StatefulWidget {
   final FleetController controller;
   final String apiUrl;
+  final Future<void> Function()? onSignOut;
 
   const FleetScreen({
     super.key,
     required this.controller,
     required this.apiUrl,
+    this.onSignOut,
   });
 
   @override
@@ -61,6 +63,12 @@ class _FleetScreenState extends State<FleetScreen>
               Text('FleetLuma', style: TextStyle(fontWeight: FontWeight.w800)),
             ]),
             actions: [
+              if (widget.onSignOut != null)
+                IconButton(
+                  tooltip: 'Sign out',
+                  onPressed: () { widget.onSignOut!.call(); },
+                  icon: const Icon(Icons.logout_rounded),
+                ),
               IconButton(
                 tooltip: 'Refresh fleet',
                 onPressed: state.isRefreshing ? null : state.refresh,

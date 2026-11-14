@@ -1,16 +1,37 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'data/fleet_api.dart';
 import 'state/fleet_controller.dart';
 import 'ui/fleet_screen.dart';
+import 'ui/sign_in_screen.dart';
 
 const apiBaseUrl = String.fromEnvironment(
   'FLEETLUMA_API_BASE_URL',
   defaultValue: 'http://10.0.2.2:8000',
 );
+const cloudMode = bool.fromEnvironment('FLEETLUMA_CLOUD_MODE');
+const supabaseUrl = String.fromEnvironment('FLEETLUMA_SUPABASE_URL');
+const supabasePublishableKey = String.fromEnvironment(
+  'FLEETLUMA_SUPABASE_PUBLISHABLE_KEY',
+);
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  if (cloudMode) {
+    if (!apiBaseUrl.startsWith('https://') ||
+        !supabaseUrl.startsWith('https://') ||
+        supabasePublishableKey.isEmpty) {
+      throw StateError('Cloud mode requires HTTPS API, Supabase URL and publishable key');
+    }
+    await Supabase.initialize(
+      url: supabaseUrl,
+      publishableKey: supabasePublishableKey,
+      debug: false,
+    );
+  }
   runApp(const FleetLumaApp());
 }
 
@@ -39,11 +60,61 @@ class FleetLumaApp extends StatelessWidget {
           foregroundColor: Colors.white,
         ),
       ),
-      home: FleetScreen(
-        controller: controller ??
-            FleetController(api: HttpFleetApi(baseUrl: apiBaseUrl)),
-        apiUrl: apiBaseUrl,
+      home: cloudMode
+          ? const _CloudAuthGate()
+          : FleetScreen(
+              controller: controller ??
+                  FleetController(api: HttpFleetApi(baseUrl: apiBaseUrl)),
+              apiUrl: apiBaseUrl,
+            ),
+    );
+  }
+}
+
+/// The FleetScreen is not mounted and never polls until a session exists.
+class _CloudAuthGate extends StatefulWidget {
+  const _CloudAuthGate();
+
+  @override
+  State<_CloudAuthGate> createState() => _CloudAuthGateState();
+}
+
+class _CloudAuthGateState extends State<_CloudAuthGate> {
+  StreamSubscription<AuthState>? _authSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    _authSubscription = Supabase.instance.client.auth.onAuthStateChange.listen(
+      (_) {
+        if (mounted) setState(() {});
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _authSubscription?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final auth = Supabase.instance.client.auth;
+    final session = auth.currentSession;
+    if (session == null) {
+      return const SignInScreen();
+    }
+    return FleetScreen(
+      key: ValueKey(session.user.id),
+      controller: FleetController(
+        api: HttpFleetApi(
+          baseUrl: apiBaseUrl,
+          tokenProvider: () async => auth.currentSession?.accessToken,
+        ),
       ),
+      apiUrl: apiBaseUrl,
+      onSignOut: () async => auth.signOut(),
     );
   }
 }
