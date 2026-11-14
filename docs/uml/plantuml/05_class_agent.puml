@@ -1,11 +1,30 @@
 @startuml 05_class_agent
-class AgentConfig { +hostId: UUID; +token: Secret; +coordinatorUrl: URL }
-class MetricsCollector { +collectCpu(): Float; +collectRam(): Memory; +collectDisk(): Disk }
-class ProcessCollector { +topProcesses(limit): ProcessEntry[*] }
-class ReportComposer { +assemble(metrics, processes): AgentReport }
-class HttpReporter { +send(report, token): Response }
-class RetryPolicy { +backoff(attempt): Duration }
-class AgentLoop { +run(); +stop() }
+class AgentConfig {
+  +hostId: UUID
+  +token: Secret
+  +coordinatorUrl: URL
+}
+class MetricsCollector {
+  +collectCpu(): Float
+  +collectRam(): Memory
+  +collectDisk(): Disk
+}
+class ProcessCollector {
+  +topProcesses(limit): ProcessEntry[*]
+}
+class ReportComposer {
+  +assemble(metrics, processes): AgentReport
+}
+class HttpReporter {
+  +send(report, token): Response
+}
+class RetryPolicy {
+  +backoff(attempt): Duration
+}
+class AgentLoop {
+  +run()
+  +stop()
+}
 AgentLoop --> MetricsCollector
 AgentLoop --> ProcessCollector
 AgentLoop --> ReportComposer
