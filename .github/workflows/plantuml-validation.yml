@@ -25,7 +25,10 @@ jobs:
           find docs/uml/plantuml -name '*.puml' -print0 | xargs -0 -r plantuml -tsvg -o /tmp/fleetluma-uml-svg
           count="$(find /tmp/fleetluma-uml-svg -name '*.svg' | wc -l)"
           echo "SVG rendered: $count"
-          test "$count" -eq 29
+          source_count="$(find docs/uml/plantuml -name '*.puml' | wc -l)"
+          echo "PlantUML sources: $source_count"
+          test "$source_count" -gt 0
+          test "$count" -eq "$source_count"
       - name: Upload rendered SVG diagrams
         uses: actions/upload-artifact@v4
         with:
