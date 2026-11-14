@@ -100,7 +100,13 @@ def create_cloud_app(store_factory=PostgresStore):
 
     @app.get("/health")
     def health():
-        # Readiness does not expose configuration or privileged monitoring data.
+        # A live Python process without a reachable database is not ready.
+        try:
+            if not store_factory().ping():
+                raise RuntimeError("PostgreSQL readiness probe failed")
+        except Exception:
+            # Never disclose connection strings or internal DB errors.
+            return JSONResponse(status_code=503, content={"status": "unavailable", "mode": "cloud"})
         return {"status": "ready", "mode": "cloud"}
 
     return app

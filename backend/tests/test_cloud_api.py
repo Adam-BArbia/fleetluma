@@ -17,6 +17,7 @@ def environment(monkeypatch):
 
 
 class FakeStore:
+    def ping(self): return True
     def hosts(self): return []
     def host(self, host_id): return None
     def services(self): return []
@@ -66,3 +67,21 @@ def test_cloud_cors_is_allowlisted(environment):
     blocked = client.options("/api/v1/hosts",
         headers={**headers,"Origin": "https://untrusted.example.test"})
     assert blocked.status_code == 400
+
+
+def test_health_is_unavailable_without_database(environment):
+    class BrokenStore(FakeStore):
+        def ping(self):
+            raise ConnectionError("private DB connection string should never leak")
+    client = TestClient(create_cloud_app(store_factory=BrokenStore))
+    response = client.get("/health")
+    assert response.status_code == 503
+    assert response.json() == {"status": "unavailable", "mode": "cloud"}
+    assert "connection string" not in response.text
+
+
+def test_health_rejects_failed_database_probe(environment):
+    class DownStore(FakeStore):
+        def ping(self): return False
+    client = TestClient(create_cloud_app(store_factory=DownStore))
+    assert client.get("/health").status_code == 503

@@ -42,6 +42,13 @@ class PostgresStore:
     def __init__(self, connect=connection):
         self._connect = connect
 
+    def ping(self):
+        """Readiness probe: fixed harmless SQL, no user-controlled query."""
+        with self._connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT 1 AS alive")
+                return cur.fetchone()["alive"] == 1
+
     def provision_host(self, host_id, name, os_name, token):
         """Provision explicitly from privileged backend control path, never user GET."""
         identifier = str(UUID(str(host_id)))
