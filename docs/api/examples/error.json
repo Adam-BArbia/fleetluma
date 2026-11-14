@@ -1,0 +1,6 @@
+{
+  "error": {
+    "code": "UNAUTHORIZED_AGENT",
+    "message": "Agent credentials were not accepted."
+  }
+}

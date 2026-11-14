@@ -1,0 +1,14 @@
+{
+  "items": [
+    {
+      "id": "9b7dcc13-d927-42ce-8710-c3592848936b",
+      "host_id": null,
+      "name": "Demo API",
+      "url": "http://192.0.2.10:8080/health",
+      "enabled": true,
+      "status": "HEALTHY",
+      "checked_at": "2026-11-14T11:30:00Z",
+      "latency_ms": 34.3
+    }
+  ]
+}

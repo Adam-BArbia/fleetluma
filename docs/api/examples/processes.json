@@ -1,0 +1,12 @@
+{
+  "host_id": "b5c48d23-4b37-4b97-8c1d-53d5f16a90d4",
+  "captured_at": "2026-11-14T11:30:00Z",
+  "processes": [
+    {
+      "pid": 2456,
+      "name": "python",
+      "cpu_pct": 105.2,
+      "memory_bytes": 230686720
+    }
+  ]
+}

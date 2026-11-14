@@ -1,0 +1,24 @@
+name: API contract validation
+on:
+  push:
+    paths:
+      - 'docs/api/**'
+      - '.github/workflows/api-contract-validation.yml'
+  pull_request:
+    paths:
+      - 'docs/api/**'
+      - '.github/workflows/api-contract-validation.yml'
+permissions:
+  contents: read
+jobs:
+  check-openapi:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install OpenAPI and JSON Schema validators
+        run: python -m pip install 'openapi-spec-validator>=0.7,<0.9' 'jsonschema>=4,<5'
+      - name: Validate OpenAPI and example documents
+        run: python docs/api/validate_contract.py
