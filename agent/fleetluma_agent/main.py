@@ -1,0 +1,76 @@
+"""Run: python -m fleetluma_agent.main (from agent directory)."""
+import json
+import logging
+import os
+import sys
+import time
+from pathlib import Path
+from urllib import error, request
+from urllib.parse import urlsplit
+
+from .collector import build_report
+
+LOG = logging.getLogger("fleetluma.agent")
+
+
+def load_config(env=None):
+    env = env or os.environ
+    url = env.get("FLEETLUMA_COORDINATOR_URL", "").rstrip("/")
+    token = env.get("FLEETLUMA_AGENT_TOKEN", "")
+    if not url or not token or token.startswith("REPLACE_"):
+        raise ValueError("Set FLEETLUMA_COORDINATOR_URL and a real unique agent token")
+    parts = urlsplit(url)
+    if parts.scheme not in {"http", "https"} or not parts.netloc:
+        raise ValueError("Coordinator must have an HTTP(S) URL")
+    if parts.scheme == "http" and parts.hostname not in {"127.0.0.1", "localhost"}:
+        LOG.warning("Plain HTTP reveals agent tokens on the network; use only a trusted lab LAN")
+    disk = env.get("FLEETLUMA_DISK_PATH", os.path.abspath(os.sep))
+    if not Path(disk).exists():
+        raise ValueError("FLEETLUMA_DISK_PATH does not exist")
+    interval = int(env.get("FLEETLUMA_INTERVAL_SECONDS", "10"))
+    if interval < 2 or interval > 3600:
+        raise ValueError("Reporting interval must be 2..3600 seconds")
+    return url, token, disk, interval
+
+
+def send_report(url, token, report, timeout=5):
+    data = json.dumps(report).encode("utf-8")
+    req = request.Request(url + "/api/v1/agent/reports", data=data, method="POST",
+        headers={"Content-Type": "application/json", "Authorization": "Bearer " + token})
+    with request.urlopen(req, timeout=timeout) as response:
+        if response.status != 202:
+            raise RuntimeError("Coordinator rejected report: HTTP " + str(response.status))
+        return json.load(response)
+
+
+def run():
+    url, token, disk, interval = load_config()
+    LOG.info("FleetLuma agent started; report interval=%ss", interval)
+    attempt = 0
+    next_process_collection = 0.0
+    while True:
+        now = time.monotonic()
+        try:
+            # Send a bounded process snapshot every ~30 seconds.
+            report = build_report(disk, include_processes=(now >= next_process_collection))
+            if "processes" in report:
+                next_process_collection = now + 30.0
+            send_report(url, token, report)
+            attempt = 0
+            LOG.info("Agent report accepted")
+            time.sleep(interval)
+        except (error.URLError, OSError, ValueError, RuntimeError) as exc:
+            # Never log credentials or payload content.
+            attempt += 1
+            LOG.warning("Report failed (%s); retrying", type(exc).__name__)
+            time.sleep(min(60, max(2, 2 ** min(attempt, 5))))
+
+
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
+    try:
+        run()
+    except (ValueError, KeyboardInterrupt) as exc:
+        if isinstance(exc, ValueError):
+            LOG.error("Invalid configuration")
+            sys.exit(2)
