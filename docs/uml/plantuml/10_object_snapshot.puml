@@ -1,11 +1,26 @@
 @startuml 10_object_snapshot
-object "hostA: Host" as h { id = "A"; state = CONNECTED }
-object "hostB: Host" as b { id = "B"; state = STALE }
-object "website: MonitoredService" as w { hostId = "A"; name = "Demo API" }
-object "check: ServiceCheck" as c { result = UNHEALTHY; httpStatus = 503 }
-object "sample: MetricSample" as s { cpuPct = 42; ramPct = 68 }
+object "hostA : Host" as h {
+  id = A
+  state = CONNECTED
+}
+object "hostB : Host" as b {
+  id = B
+  state = STALE
+}
+object "website : MonitoredService" as w {
+  hostId = A
+  name = Demo API
+}
+object "check : ServiceCheck" as c {
+  result = UNHEALTHY
+  httpStatus = 503
+}
+object "sample : MetricSample" as s {
+  cpuPct = 42
+  ramPct = 68
+}
 h -- w
 w -- c
 h -- s
-note right of w: An HTTP service can fail while its host agent reports normally.
+note right of w : An HTTP service can fail while its host agent reports normally.
 @enduml
