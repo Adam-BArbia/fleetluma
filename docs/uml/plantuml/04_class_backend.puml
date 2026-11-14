@@ -3,13 +3,29 @@ interface HostRepository {
  +findById(id): Host?
  +updateHeartbeat(id, time)
 }
-interface MetricsRepository { +save(sample); +history(hostId, window) }
-interface ServiceRepository { +listEnabled(); +saveCheck(check) }
-class AgentIngestionService { +accept(report, token): Result }
-class Authenticator { +resolveHost(token): Host? }
-class HostStatusPolicy { +state(lastSeenAt, now): HostState }
-class HttpCheckWorker { +checkEnabledServices() }
-class HistoryQueryService { +metrics(hostId, window) }
+interface MetricsRepository {
+  +save(sample)
+  +history(hostId, window)
+}
+interface ServiceRepository {
+  +listEnabled()
+  +saveCheck(check)
+}
+class AgentIngestionService {
+  +accept(report, token): Result
+}
+class Authenticator {
+  +resolveHost(token): Host?
+}
+class HostStatusPolicy {
+  +state(lastSeenAt, now): HostState
+}
+class HttpCheckWorker {
+  +checkEnabledServices()
+}
+class HistoryQueryService {
+  +metrics(hostId, window)
+}
 AgentIngestionService --> Authenticator
 AgentIngestionService --> HostRepository
 AgentIngestionService --> MetricsRepository
