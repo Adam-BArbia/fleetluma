@@ -1,0 +1,19 @@
+{
+  "sampled_at": "2026-11-14T11:30:00Z",
+  "metrics": {
+    "cpu_pct": 42.5,
+    "ram_used_bytes": 5368709120,
+    "ram_total_bytes": 8589934592,
+    "disk_path": "/",
+    "disk_used_bytes": 107374182400,
+    "disk_total_bytes": 214748364800
+  },
+  "processes": [
+    {
+      "pid": 2456,
+      "name": "python",
+      "cpu_pct": 105.2,
+      "memory_bytes": 230686720
+    }
+  ]
+}

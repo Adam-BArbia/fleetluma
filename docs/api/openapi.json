@@ -1,0 +1,914 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "FleetLuma API",
+    "version": "0.1.0",
+    "description": "FL-6 contract-first design for local-network proof-of-concept. Agent token authentication is required for ingestion. Read-only mobile routes intentionally have no authentication in the controlled LAN demo: do not expose them on untrusted networks."
+  },
+  "servers": [
+    {
+      "url": "http://127.0.0.1:8000",
+      "description": "Coordinator host local development (emulators and physical phones must use reachable LAN/loopback mapping)"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Agent"
+    },
+    {
+      "name": "Mobile"
+    }
+  ],
+  "paths": {
+    "/api/v1/agent/reports": {
+      "post": {
+        "tags": [
+          "Agent"
+        ],
+        "summary": "Accept authenticated host monitoring report",
+        "description": "Authorization: Bearer token. Server resolves host identity strictly from the token, not a client-supplied host_id. Only a fully validated and transactionally committed report updates last_seen_at. captured_at sampled_at is the agent clock; received_at is coordinator UTC time. Duplicate reports are allowed as separate samples in MVP; retries may yield duplicates. No remote commands.",
+        "security": [
+          {
+            "AgentToken": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentReport"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Accepted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Accepted"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/hosts": {
+      "get": {
+        "tags": [
+          "Mobile"
+        ],
+        "summary": "List fleet with latest metrics and heartbeat status",
+        "responses": {
+          "200": {
+            "description": "HostList",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HostList"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/hosts/{id}": {
+      "get": {
+        "tags": [
+          "Mobile"
+        ],
+        "summary": "Get one host and latest metrics",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Host",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Host"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/hosts/{id}/history": {
+      "get": {
+        "tags": [
+          "Mobile"
+        ],
+        "summary": "Get 24-hour-retained time series",
+        "description": "At most 24h. Use sampled_at for measurements, received_at for freshness; output is ordered ascending.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "window",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "15m",
+                "1h",
+                "24h"
+              ],
+              "default": "1h"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "HostHistory",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HostHistory"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/hosts/{id}/processes": {
+      "get": {
+        "tags": [
+          "Mobile"
+        ],
+        "summary": "Get latest read-only process snapshot",
+        "description": "An absent snapshot returns captured_at null with an empty array. CPU percent may exceed 100 on multi-core systems.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "ProcessSnapshot",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProcessSnapshot"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/services": {
+      "get": {
+        "tags": [
+          "Mobile"
+        ],
+        "summary": "List monitored HTTP services",
+        "description": "Service configuration is done out-of-band. A service can have no host_id, and service health is not derived from agent heartbeat.",
+        "responses": {
+          "200": {
+            "description": "ServiceList",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceList"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/services/{id}/checks": {
+      "get": {
+        "tags": [
+          "Mobile"
+        ],
+        "summary": "Get HTTP check history",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "window",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "15m",
+                "1h",
+                "24h"
+              ],
+              "default": "1h"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "ServiceChecks",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ServiceChecks"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Error response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "AgentToken": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "opaque per-agent token"
+      }
+    },
+    "schemas": {
+      "MetricPayload": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "cpu_pct": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "ram_used_bytes": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "ram_total_bytes": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "disk_path": {
+            "type": "string"
+          },
+          "disk_used_bytes": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "disk_total_bytes": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "cpu_pct",
+          "ram_used_bytes",
+          "ram_total_bytes",
+          "disk_path",
+          "disk_used_bytes",
+          "disk_total_bytes"
+        ]
+      },
+      "Process": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "pid": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "name": {
+            "type": "string"
+          },
+          "cpu_pct": {
+            "type": "number",
+            "minimum": 0
+          },
+          "memory_bytes": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "pid",
+          "name",
+          "cpu_pct",
+          "memory_bytes"
+        ]
+      },
+      "AgentReport": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "sampled_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "metrics": {
+            "$ref": "#/components/schemas/MetricPayload"
+          },
+          "processes": {
+            "type": "array",
+            "maxItems": 10,
+            "items": {
+              "$ref": "#/components/schemas/Process"
+            }
+          }
+        },
+        "required": [
+          "sampled_at",
+          "metrics"
+        ]
+      },
+      "Accepted": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "host_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "received_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "accepted"
+            ]
+          }
+        },
+        "required": [
+          "host_id",
+          "received_at",
+          "status"
+        ]
+      },
+      "HostMetrics": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "cpu_pct": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "ram_used_bytes": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "ram_total_bytes": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "ram_pct": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "disk_path": {
+            "type": "string"
+          },
+          "disk_used_bytes": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "disk_total_bytes": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "disk_pct": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "sampled_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "received_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "cpu_pct",
+          "ram_used_bytes",
+          "ram_total_bytes",
+          "ram_pct",
+          "disk_path",
+          "disk_used_bytes",
+          "disk_total_bytes",
+          "disk_pct",
+          "sampled_at",
+          "received_at"
+        ]
+      },
+      "Host": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "os": {
+            "type": "string",
+            "enum": [
+              "linux",
+              "windows"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "CONNECTED",
+              "STALE"
+            ]
+          },
+          "last_seen_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "latest_metrics": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/HostMetrics"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "os",
+          "status",
+          "last_seen_at",
+          "latest_metrics"
+        ]
+      },
+      "HostList": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Host"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "HistoryPoint": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "sampled_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "received_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "cpu_pct": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "ram_pct": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "disk_pct": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100
+          }
+        },
+        "required": [
+          "sampled_at",
+          "received_at",
+          "cpu_pct",
+          "ram_pct",
+          "disk_pct"
+        ]
+      },
+      "HostHistory": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "host_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "window": {
+            "type": "string",
+            "enum": [
+              "15m",
+              "1h",
+              "24h"
+            ]
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HistoryPoint"
+            }
+          }
+        },
+        "required": [
+          "host_id",
+          "window",
+          "items"
+        ]
+      },
+      "ProcessSnapshot": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "host_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "captured_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "processes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Process"
+            }
+          }
+        },
+        "required": [
+          "host_id",
+          "captured_at",
+          "processes"
+        ]
+      },
+      "Service": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "host_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "UNKNOWN",
+              "HEALTHY",
+              "UNHEALTHY"
+            ]
+          },
+          "checked_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "latency_ms": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "host_id",
+          "name",
+          "url",
+          "enabled",
+          "status",
+          "checked_at",
+          "latency_ms"
+        ]
+      },
+      "ServiceList": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Service"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "ServiceCheck": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "checked_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "HEALTHY",
+              "UNHEALTHY"
+            ]
+          },
+          "http_code": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 100,
+                "maximum": 599
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "latency_ms": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "failure_kind": {
+            "type": "string",
+            "enum": [
+              "none",
+              "http_error",
+              "timeout",
+              "network_error"
+            ]
+          }
+        },
+        "required": [
+          "checked_at",
+          "status",
+          "http_code",
+          "latency_ms",
+          "failure_kind"
+        ]
+      },
+      "ServiceChecks": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "service_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "window": {
+            "type": "string",
+            "enum": [
+              "15m",
+              "1h",
+              "24h"
+            ]
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ServiceCheck"
+            }
+          }
+        },
+        "required": [
+          "service_id",
+          "window",
+          "items"
+        ]
+      },
+      "ApiError": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "error": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "code",
+              "message"
+            ]
+          }
+        },
+        "required": [
+          "error"
+        ]
+      }
+    }
+  }
+}
