@@ -1,0 +1,24 @@
+name: Cloud preview boundary contract
+on:
+  push:
+    paths:
+      - 'scripts/verify_cloud_preview.py'
+      - 'scripts/test_verify_cloud_preview.py'
+      - '.github/workflows/cloud-preview-contract.yml'
+  pull_request:
+    paths:
+      - 'scripts/verify_cloud_preview.py'
+      - 'scripts/test_verify_cloud_preview.py'
+      - '.github/workflows/cloud-preview-contract.yml'
+permissions:
+  contents: read
+jobs:
+  verify-preview-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Test smoke-test security and response policy
+        run: python -m unittest -v scripts.test_verify_cloud_preview
