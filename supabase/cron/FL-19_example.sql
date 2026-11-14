@@ -1,0 +1,30 @@
+-- FL-19 example ONLY: review before executing against Supabase.
+-- Set project URL and a cryptographically random FLEETLUMA_CRON_SECRET in
+-- Supabase Vault first; never copy secrets into a GitHub commit.
+-- Enable pg_cron and pg_net separately in the approved Supabase project.
+-- Run only AFTER deploying the Edge Function with matching secret.
+--
+-- select vault.create_secret('https://YOUR-PROJECT.supabase.co', 'fleetluma_project_url');
+-- select vault.create_secret('<secret-entered-manually>', 'fleetluma_cron_secret');
+--
+-- select cron.schedule('fleetluma-check-every-minute', '* * * * *', $cron$
+--   select net.http_post(
+--     url := (select decrypted_secret from vault.decrypted_secrets
+--             where name='fleetluma_project_url') || '/functions/v1/fleetluma-checker',
+--     headers := jsonb_build_object(
+--       'Content-Type', 'application/json',
+--       'x-fleetluma-cron', (select decrypted_secret from vault.decrypted_secrets
+--                            where name='fleetluma_cron_secret')
+--     ),
+--     body := '{}'::jsonb,
+--     timeout_milliseconds := 15000
+--   );
+-- $cron$);
+--
+-- Note: This function must reject unauthenticated requests. Supabase Edge Function
+-- gateway JWT verification may require an explicit project config for custom
+-- X-FleetLuma-Cron auth; do not disable gateway protection without considering
+-- the additional shared-secret boundary, secret length, and network exposure.
+--
+-- Unschedule if the checker encounters errors or your free-plan limits are reached:
+-- select cron.unschedule('fleetluma-check-every-minute');
