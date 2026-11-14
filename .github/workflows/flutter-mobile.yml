@@ -1,0 +1,36 @@
+name: Flutter mobile tests
+on:
+  push:
+    paths:
+      - 'mobile/**'
+      - '.github/workflows/flutter-mobile.yml'
+  pull_request:
+    paths:
+      - 'mobile/**'
+      - '.github/workflows/flutter-mobile.yml'
+permissions:
+  contents: read
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+      - name: Generate Android platform scaffold
+        working-directory: mobile
+        run: flutter create --platforms=android --project-name fleetluma .
+      - name: Fetch packages
+        working-directory: mobile
+        run: flutter pub get
+      - name: Static analysis
+        working-directory: mobile
+        run: flutter analyze
+      - name: Unit and widget tests
+        working-directory: mobile
+        run: flutter test
+      - name: Build Android debug APK
+        working-directory: mobile
+        run: flutter build apk --debug --dart-define=FLEETLUMA_API_BASE_URL=http://10.0.2.2:8000
