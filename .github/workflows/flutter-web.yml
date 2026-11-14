@@ -33,7 +33,7 @@ jobs:
         run: flutter test
       - name: Release Web build (non-secret placeholder API origin)
         working-directory: mobile
-        run: flutter build web --release --dart-define=FLEETLUMA_API_BASE_URL=https://api.example.invalid
+        run: flutter build web --release --dart-define=FLEETLUMA_API_BASE_URL=https://api.example.invalid --dart-define=FLEETLUMA_CLOUD_MODE=true --dart-define=FLEETLUMA_SUPABASE_URL=https://demo.supabase.co --dart-define=FLEETLUMA_SUPABASE_PUBLISHABLE_KEY=sb_publishable_placeholder
       - name: Assert web bundle generated
         run: test -f mobile/build/web/index.html
       - name: Upload static Web build for subsequent Vercel deployment

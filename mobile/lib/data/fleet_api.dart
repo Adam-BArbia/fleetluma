@@ -17,11 +17,13 @@ class HttpFleetApi implements FleetApi {
   final Uri baseUri;
   final Duration timeout;
   final http.Client? _injectedClient;
+  final Future<String?> Function()? tokenProvider;
 
   HttpFleetApi({
     required String baseUrl,
     this.timeout = const Duration(seconds: 5),
     http.Client? client,
+    this.tokenProvider,
   })  : _injectedClient = client,
         baseUri = Uri.parse(baseUrl) {
     if (!baseUri.hasAuthority ||
@@ -37,8 +39,16 @@ class HttpFleetApi implements FleetApi {
       final endpoint = baseUri.replace(
         path: '${baseUri.path.replaceFirst(RegExp(r'/$'), '')}/api/v1/hosts',
       );
+      final headers = <String, String>{'Accept': 'application/json'};
+      if (tokenProvider != null) {
+        final jwt = await tokenProvider!();
+        if (jwt == null || jwt.isEmpty) {
+          throw const FleetConnectionException('Session expired. Sign in again.');
+        }
+        headers['Authorization'] = 'Bearer $jwt';
+      }
       final response = await client
-          .get(endpoint, headers: {'Accept': 'application/json'})
+          .get(endpoint, headers: headers)
           .timeout(timeout);
       if (response.statusCode != 200) {
         throw FleetConnectionException(
