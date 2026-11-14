@@ -1,5 +1,5 @@
 import { assertEquals, assertRejects, assertThrows } from "jsr:@std/assert@1.0.10";
-import { allowedTarget, probe } from "./checker.ts";
+import { allowedTarget, probe, isPublicIpv4, verifyPublicDns } from "./checker.ts";
 
 const allowed = new Set(["status.example.test"]);
 
@@ -41,4 +41,23 @@ Deno.test("Network errors do not masquerade as HEALTHY", async () => {
   assertEquals(failure.status, "UNHEALTHY");
   assertEquals(failure.http_code, null);
   assertEquals(failure.failure_kind, "network_error");
+});
+
+Deno.test("Private, metadata and special IPv4 addresses are rejected", () => {
+  for (const ip of ["127.0.0.1", "10.4.5.6", "192.168.1.2",
+    "172.16.1.1", "169.254.169.254", "100.64.0.1",
+    "0.0.0.0", "198.18.0.1", "203.0.113.10", "255.255.255.255"]) {
+    assertEquals(isPublicIpv4(ip), false);
+  }
+  assertEquals(isPublicIpv4("8.8.8.8"), true);
+});
+
+Deno.test("Public DNS verification rejects private and IPv6 answers", async () => {
+  const target = allowedTarget("https://status.example.test/", allowed);
+  await verifyPublicDns(target, async (_hostname, family) =>
+    family === "A" ? ["8.8.8.8"] : []);
+  await assertRejects(() => verifyPublicDns(target, async (_hostname, family) =>
+    family === "A" ? ["127.0.0.1"] : []));
+  await assertRejects(() => verifyPublicDns(target, async (_hostname, family) =>
+    family === "A" ? ["8.8.8.8"] : ["::1"]));
 });

@@ -53,3 +53,38 @@ export async function probe(
     };
   }
 }
+
+/** Defense in depth: reject DNS answers in private/special-use IPv4 ranges.
+ * IPv6 is conservatively denied for this demo. The DNS-to-connect race still
+ * requires separate egress restrictions before internet-facing deployment.
+ */
+export function isPublicIpv4(raw: string): boolean {
+  const parts = raw.split(".");
+  if (parts.length !== 4 || parts.some((p) => !/^\d{1,3}$/.test(p) ||
+      (p.length > 1 && p[0] === "0"))) return false;
+  const nums = parts.map(Number);
+  if (nums.some((n) => n > 255)) return false;
+  const [a, b, c] = nums;
+  if (a === 0 || a === 10 || a === 127 || a >= 224 ||
+      a === 169 && b === 254 || a === 172 && b >= 16 && b <= 31 ||
+      a === 192 && b === 168 || a === 100 && b >= 64 && b <= 127 ||
+      a === 192 && b === 0 && c === 0 ||
+      a === 192 && b === 0 && c === 2 ||
+      a === 198 && (b === 18 || b === 19 || b === 51 && c === 100) ||
+      a === 203 && b === 0 && c === 113) return false;
+  return true;
+}
+
+export async function verifyPublicDns(
+  target: URL,
+  resolver: (hostname: string, family: "A" | "AAAA") => Promise<string[]> =
+    async (hostname, family) => Deno.resolveDns(hostname, family),
+): Promise<void> {
+  // Fail closed if the resolver is disabled / cannot inspect addresses.
+  const ipv4 = await resolver(target.hostname, "A");
+  const ipv6 = await resolver(target.hostname, "AAAA");
+  if (ipv4.length === 0 || ipv6.length > 0 ||
+      ipv4.some((address) => !isPublicIpv4(address))) {
+    throw new Error("Public IPv4-only DNS verification failed");
+  }
+}
