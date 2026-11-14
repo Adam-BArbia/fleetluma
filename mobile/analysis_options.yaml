@@ -1,0 +1,8 @@
+include: package:flutter_lints/flutter.yaml
+
+analyzer:
+  errors:
+    # Flutter 3.50 flags material.dart as deprecated while the project
+    # uses stable Material components. Follow up when the new material_ui
+    # dependency becomes standard and migration is supported.
+    deprecated_member_use: ignore
