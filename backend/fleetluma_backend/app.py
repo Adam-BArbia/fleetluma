@@ -11,11 +11,13 @@ from uuid import UUID
 
 from . import service_checks
 
-from fastapi import FastAPI, Header, HTTPException, Query
+from fastapi import Depends, FastAPI, Header, HTTPException, Query
+from .operator_auth import require_operator, configure_cors
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 app = FastAPI(title="FleetLuma API", version="0.1.0")
+configure_cors(app)
 
 
 def utcnow():
@@ -202,13 +204,13 @@ def serialize_host(conn, row):
 
 
 @app.get("/api/v1/hosts")
-def hosts():
+def hosts(operator: str | None = Depends(require_operator)):
     with db() as conn:
         return {"items": [serialize_host(conn, row) for row in conn.execute("SELECT * FROM hosts ORDER BY name")]}
 
 
 @app.get("/api/v1/hosts/{id}")
-def host(id: str):
+def host(id: str, operator: str | None = Depends(require_operator)):
     with db() as conn:
         return serialize_host(conn, require_known_host(conn, id))
 
@@ -217,7 +219,7 @@ WINDOWS = {"15m": timedelta(minutes=15), "1h": timedelta(hours=1), "24h": timede
 
 
 @app.get("/api/v1/hosts/{id}/history")
-def history(id: str, window: str = Query(default="1h", pattern="^(15m|1h|24h)$")):
+def history(id: str, window: str = Query(default="1h", pattern="^(15m|1h|24h)$"), operator: str | None = Depends(require_operator)):
     with db() as conn:
         row = require_known_host(conn, id)
         cutoff = stamp(utcnow() - WINDOWS[window])
@@ -236,7 +238,7 @@ def history(id: str, window: str = Query(default="1h", pattern="^(15m|1h|24h)$")
 
 
 @app.get("/api/v1/hosts/{id}/processes")
-def processes(id: str):
+def processes(id: str, operator: str | None = Depends(require_operator)):
     with db() as conn:
         row = require_known_host(conn, id)
         snap = conn.execute("SELECT * FROM process_snapshots WHERE host_id=?", (row["id"],)).fetchone()
@@ -245,13 +247,13 @@ def processes(id: str):
 
 
 @app.get("/api/v1/services")
-def list_services():
+def list_services(operator: str | None = Depends(require_operator)):
     with db() as conn:
         return {"items": service_checks.list_services(conn)}
 
 
 @app.get("/api/v1/services/{id}/checks")
-def list_service_checks(id: str, window: str = Query(default="1h", pattern="^(15m|1h|24h)$")):
+def list_service_checks(id: str, window: str = Query(default="1h", pattern="^(15m|1h|24h)$"), operator: str | None = Depends(require_operator)):
     with db() as conn:
         try:
             normalized = str(UUID(id))
