@@ -9,6 +9,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from uuid import UUID
 
+from . import service_checks
+
 from fastapi import FastAPI, Header, HTTPException, Query
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -81,11 +83,18 @@ def provision():
             conn.execute(
                 "INSERT OR IGNORE INTO hosts(id,name,os,token_hash) VALUES(?,?,?,?)",
                 (identifier, name, osname, digest))
+        service_checks.provision_services(conn)
 
 
 @app.on_event("startup")
 def startup():
     provision()
+    service_checks.start_worker(db)
+
+
+@app.on_event("shutdown")
+def shutdown():
+    service_checks.stop_worker()
 
 
 class StrictModel(BaseModel):
@@ -233,3 +242,22 @@ def processes(id: str):
         snap = conn.execute("SELECT * FROM process_snapshots WHERE host_id=?", (row["id"],)).fetchone()
         return {"host_id": row["id"], "captured_at": snap["captured_at"] if snap else None,
                 "processes": json.loads(snap["processes"]) if snap else []}
+
+
+@app.get("/api/v1/services")
+def list_services():
+    with db() as conn:
+        return {"items": service_checks.list_services(conn)}
+
+
+@app.get("/api/v1/services/{id}/checks")
+def list_service_checks(id: str, window: str = Query(default="1h", pattern="^(15m|1h|24h)$")):
+    with db() as conn:
+        try:
+            normalized = str(UUID(id))
+        except ValueError:
+            raise HTTPException(404, "Unknown service")
+        if conn.execute("SELECT 1 FROM services WHERE id=?", (normalized,)).fetchone() is None:
+            raise HTTPException(404, "Unknown service")
+        return {"service_id": normalized, "window": window,
+                "items": service_checks.read_checks(conn, normalized, WINDOWS[window])}
