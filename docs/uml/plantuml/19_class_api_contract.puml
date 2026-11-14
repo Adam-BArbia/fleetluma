@@ -1,0 +1,28 @@
+@startuml 19_class_api_contract
+class AgentReportDTO {
+ +timestamp: Instant
+ +metrics: SystemMetricsDTO
+ +processes: ProcessDTO[0..10]?
+}
+class SystemMetricsDTO {
+ +cpuPct: Float
+ +ramUsedBytes: Long
+ +ramTotalBytes: Long
+ +diskPath: String
+ +diskUsedBytes: Long
+ +diskTotalBytes: Long
+}
+class ProcessDTO {
+ +pid: Int
+ +name: String
+ +cpuPct: Float
+ +memoryBytes: Long
+}
+class AcceptedReportResponse { +acceptedAt: Instant }
+AgentReportDTO *-- SystemMetricsDTO
+AgentReportDTO *-- "0..10" ProcessDTO
+note right of AgentReportDTO
+ Host identity must come from the agent token,
+ not a client-provided host identifier.
+end note
+@enduml

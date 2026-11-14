@@ -1,0 +1,17 @@
+@startuml 11_activity_agent
+start
+:Read configured host ID and token;
+:Sample CPU/RAM/disk;
+if (Process sampling due?) then (yes)
+ :Collect top 10 processes;
+endif
+:Compose report;
+:POST report to coordinator;
+if (HTTP accepted?) then (yes)
+ :Schedule next sample;
+else (no)
+ :Record local error;
+ :Apply bounded retry/backoff;
+endif
+stop
+@enduml

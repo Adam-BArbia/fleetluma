@@ -1,0 +1,19 @@
+@startuml 01_use_cases_operator
+left to right direction
+actor Operator
+rectangle "FleetLuma mobile monitoring" {
+ usecase "View fleet overview" as Fleet
+ usecase "Inspect host metrics" as Host
+ usecase "View historical graphs" as Graph
+ usecase "Inspect top processes" as Proc
+ usecase "Inspect HTTP service health" as Service
+ usecase "See latest report age" as Age
+}
+Operator --> Fleet
+Operator --> Host
+Operator --> Graph
+Operator --> Proc
+Operator --> Service
+Fleet ..> Age : <<include>>
+Host ..> Age : <<include>>
+@enduml

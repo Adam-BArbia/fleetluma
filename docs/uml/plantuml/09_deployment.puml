@@ -1,0 +1,19 @@
+@startuml 09_deployment
+node "PC A (Linux/Windows)" as A {
+ artifact "Python Agent A" as aa
+ artifact "FastAPI Coordinator" as backend
+ database "SQLite" as db
+ artifact "Test HTTP service" as test
+}
+node "PC B (Linux/Windows)" as B { artifact "Python Agent B" as ab }
+node "Android Phone / Emulator" as Phone { artifact "Flutter FleetLuma" as app }
+aa --> backend : HTTP POST over LAN
+ab --> backend : HTTP POST over LAN
+app --> backend : REST/JSON over LAN
+backend --> db : local access
+backend --> test : HTTP probes
+note bottom of A
+ Demo deployment choice; coordinator can reside
+ on PC A while the other agent runs on PC B.
+end note
+@enduml

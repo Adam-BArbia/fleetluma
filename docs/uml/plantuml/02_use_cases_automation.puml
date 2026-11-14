@@ -1,0 +1,21 @@
+@startuml 02_use_cases_automation
+left to right direction
+actor "Monitoring agent" as Agent
+actor "Check scheduler" as Scheduler
+actor "HTTP endpoint" as Endpoint
+rectangle "FleetLuma coordinator" {
+ usecase "Authenticate agent" as Auth
+ usecase "Receive metric report" as Ingest
+ usecase "Persist samples" as Store
+ usecase "Update heartbeat" as Heart
+ usecase "Run approved HTTP probe" as Probe
+ usecase "Record service result" as Result
+}
+Agent --> Ingest
+Ingest ..> Auth : <<include>>
+Ingest ..> Store : <<include>>
+Ingest ..> Heart : <<include>>
+Scheduler --> Probe
+Endpoint -- Probe
+Probe ..> Result : <<include>>
+@enduml

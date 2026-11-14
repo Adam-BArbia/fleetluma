@@ -1,0 +1,13 @@
+@startuml 17_state_agent
+[*] --> STARTING
+STARTING --> COLLECTING : configuration loaded
+STARTING --> CONFIG_ERROR : invalid config
+COLLECTING --> REPORTING : sample ready
+REPORTING --> COLLECTING : 2xx accepted
+REPORTING --> RETRY_WAIT : transport/server failure
+RETRY_WAIT --> REPORTING : retry permitted
+COLLECTING --> STOPPED : shutdown
+RETRY_WAIT --> STOPPED : shutdown
+CONFIG_ERROR --> STOPPED : stop
+STOPPED --> [*]
+@enduml

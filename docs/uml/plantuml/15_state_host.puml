@@ -1,0 +1,8 @@
+@startuml 15_state_host
+[*] --> PENDING
+PENDING --> CONNECTED : first accepted report
+CONNECTED --> CONNECTED : accepted report
+CONNECTED --> STALE : silence > threshold
+STALE --> CONNECTED : valid report received
+note right of STALE: Agent data is old; physical host power is unknown.
+@enduml

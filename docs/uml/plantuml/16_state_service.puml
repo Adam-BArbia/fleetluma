@@ -1,0 +1,10 @@
+@startuml 16_state_service
+[*] --> UNKNOWN
+UNKNOWN --> HEALTHY : accepted successful HTTP check
+UNKNOWN --> UNHEALTHY : first failed check
+HEALTHY --> UNHEALTHY : latest check fails
+UNHEALTHY --> HEALTHY : latest check succeeds
+HEALTHY --> HEALTHY : successful check
+UNHEALTHY --> UNHEALTHY : failed check
+note right of UNKNOWN: Before first check, neither healthy nor unhealthy can be concluded.
+@enduml

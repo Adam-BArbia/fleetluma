@@ -1,0 +1,12 @@
+@startuml 26_communication_ingestion
+object "agent:MonitoringAgent" as A
+object "api:AgentEndpoint" as B
+object "auth:TokenValidator" as C
+object "metrics:Repository" as D
+object "registry:HostRepository" as E
+A --> B : 1: POST report
+B --> C : 1.1: resolveToken()
+B --> D : 1.2: persistSample()
+B --> E : 1.3: updateLastSeenAt()
+B --> A : 1.4: 202 Accepted
+@enduml
