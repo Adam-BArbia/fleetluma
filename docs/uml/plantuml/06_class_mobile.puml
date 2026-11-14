@@ -1,12 +1,32 @@
 @startuml 06_class_mobile
-class FleetScreen { +renderHosts() }
-class HostDetailScreen { +renderMetricHistory() }
-class ProcessesScreen { +renderTopTen() }
-class ServicesScreen { +renderServiceChecks() }
-class MonitoringApiClient { +getHosts(); +getHistory(id); +getProcesses(id); +getServices() }
-class FleetViewModel { +load(); +refresh() }
-class HostViewModel { +load(id) }
-class ServiceViewModel { +load() }
+class FleetScreen {
+  +renderHosts()
+}
+class HostDetailScreen {
+  +renderMetricHistory()
+}
+class ProcessesScreen {
+  +renderTopTen()
+}
+class ServicesScreen {
+  +renderServiceChecks()
+}
+class MonitoringApiClient {
+  +getHosts()
+  +getHistory(id)
+  +getProcesses(id)
+  +getServices()
+}
+class FleetViewModel {
+  +load()
+  +refresh()
+}
+class HostViewModel {
+  +load(id)
+}
+class ServiceViewModel {
+  +load()
+}
 FleetScreen --> FleetViewModel
 HostDetailScreen --> HostViewModel
 ProcessesScreen --> HostViewModel

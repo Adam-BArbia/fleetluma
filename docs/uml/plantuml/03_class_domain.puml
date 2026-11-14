@@ -14,7 +14,9 @@ class MetricSample {
  +diskUsedBytes: Long
  +diskTotalBytes: Long
 }
-class ProcessSnapshot { +capturedAt: Instant }
+class ProcessSnapshot {
+  +capturedAt: Instant
+}
 class ProcessEntry {
  +pid: Integer
  +name: String
@@ -32,8 +34,16 @@ class ServiceCheck {
  +latencyMs: Float?
  +result: CheckResult
 }
-enum HostState { PENDING; CONNECTED; STALE }
-enum CheckResult { UNKNOWN; HEALTHY; UNHEALTHY }
+enum HostState {
+  PENDING
+  CONNECTED
+  STALE
+}
+enum CheckResult {
+  UNKNOWN
+  HEALTHY
+  UNHEALTHY
+}
 Host "1" -- "0..*" MetricSample
 Host "1" -- "0..1" ProcessSnapshot
 ProcessSnapshot "1" *-- "0..10" ProcessEntry

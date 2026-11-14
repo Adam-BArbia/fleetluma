@@ -18,7 +18,9 @@ class ProcessDTO {
  +cpuPct: Float
  +memoryBytes: Long
 }
-class AcceptedReportResponse { +acceptedAt: Instant }
+class AcceptedReportResponse {
+  +acceptedAt: Instant
+}
 AgentReportDTO *-- SystemMetricsDTO
 AgentReportDTO *-- "0..10" ProcessDTO
 note right of AgentReportDTO

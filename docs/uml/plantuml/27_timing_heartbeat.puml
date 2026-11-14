@@ -1,19 +1,22 @@
 @startuml 27_timing_heartbeat
+title Host heartbeat freshness (illustrative, each unit = 10 s)
 robust "Host connection state" as H
 @0
 H is PENDING
-@10
-H is CONNECTED : first accepted report
-@20
-H is CONNECTED : report
-@30
-H is CONNECTED : report
-@66
-H is STALE : no accepted report > 35 s
-@80
-H is CONNECTED : valid report resumes
-note bottom of H
- Times are illustrative. State is computed from
- coordinator receipt time, not agent local clock.
-end note
+@1
+H is CONNECTED
+@2
+H is CONNECTED
+@3
+H is CONNECTED
+@7
+H is STALE
+@8
+H is CONNECTED
+legend bottom
+  Accepted reports at t=10, 20, 30 and 80 seconds.
+  At t=70, no report has arrived for 40 seconds:
+  beyond the proposed 35-second stale threshold.
+  STALE does not prove the physical host is powered off.
+endlegend
 @enduml

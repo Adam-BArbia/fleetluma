@@ -1,0 +1,33 @@
+name: PlantUML validation
+on:
+  push:
+    paths:
+      - 'docs/uml/plantuml/**'
+      - '.github/workflows/plantuml-validation.yml'
+  pull_request:
+    paths:
+      - 'docs/uml/plantuml/**'
+      - '.github/workflows/plantuml-validation.yml'
+permissions:
+  contents: read
+jobs:
+  render-all:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install PlantUML and Graphviz
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y plantuml graphviz
+      - name: Check and render all UML sources to SVG
+        run: |
+          mkdir -p /tmp/fleetluma-uml-svg
+          find docs/uml/plantuml -name '*.puml' -print0 | xargs -0 -r plantuml -tsvg -o /tmp/fleetluma-uml-svg
+          count="$(find /tmp/fleetluma-uml-svg -name '*.svg' | wc -l)"
+          echo "SVG rendered: $count"
+          test "$count" -eq 29
+      - name: Upload rendered SVG diagrams
+        uses: actions/upload-artifact@v4
+        with:
+          name: fleetluma-uml-svg
+          path: /tmp/fleetluma-uml-svg/
