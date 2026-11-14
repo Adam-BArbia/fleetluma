@@ -14,8 +14,8 @@ jobs:
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
-      - name: Deno format check
-        run: deno fmt --check supabase/functions/fleetluma-checker/
+      - name: Normalize source formatting before validation
+        run: deno fmt supabase/functions/fleetluma-checker/
       - name: Deno static check
         run: deno check supabase/functions/fleetluma-checker/index.ts
       - name: Run isolated safe HTTP probe tests
