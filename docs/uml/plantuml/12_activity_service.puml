@@ -1,0 +1,17 @@
+@startuml 12_activity_service
+start
+:Scheduler selects approved enabled service;
+:Start bounded HTTP request;
+if (Response received?) then (yes)
+ :Record status code and latency;
+ if (Code is 2xx/3xx?) then (yes)
+ :Set HEALTHY result;
+ else (no)
+ :Set UNHEALTHY (HTTP response);
+ endif
+else (no)
+ :Set UNHEALTHY (timeout/network error);
+endif
+:Persist service check;
+stop
+@enduml

@@ -1,0 +1,18 @@
+@startuml 25_seq_outage_recovery
+participant "Demo service" as S
+participant "HTTP checker" as C
+database SQLite as DB
+participant "Flutter client" as UI
+S -> S : Stop service
+C -> S : Periodic GET
+S --> C : connection failure
+C -> DB : store UNHEALTHY
+UI -> DB : via monitoring API
+DB --> UI : UNHEALTHY
+S -> S : Restart service
+C -> S : Periodic GET
+S --> C : 200 OK
+C -> DB : store HEALTHY
+UI -> DB : via monitoring API
+DB --> UI : HEALTHY
+@enduml

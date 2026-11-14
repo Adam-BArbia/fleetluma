@@ -1,0 +1,11 @@
+@startuml 18_state_mobile
+[*] --> LOADING
+LOADING --> READY : API data received
+LOADING --> EMPTY : API returns no registered hosts
+LOADING --> ERROR : timeout / API failure
+READY --> REFRESHING : 5s poll
+REFRESHING --> READY : updated data
+REFRESHING --> ERROR : failed fetch
+ERROR --> LOADING : retry
+EMPTY --> LOADING : refresh
+@enduml

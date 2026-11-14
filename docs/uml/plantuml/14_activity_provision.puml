@@ -1,0 +1,14 @@
+@startuml 14_activity_provision
+start
+:Operator selects host identifier;
+:Generate unique agent token out of band;
+:Store token hash in coordinator;
+:Configure agent URL, ID, and secret locally;
+:Start installed agent;
+if (Authenticated report accepted?) then (yes)
+ :Show host CONNECTED;
+else (no)
+ :Troubleshoot network/token without exposing secret;
+endif
+stop
+@enduml

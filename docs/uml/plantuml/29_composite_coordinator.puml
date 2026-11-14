@@ -1,0 +1,19 @@
+@startuml 29_composite_coordinator
+rectangle "FastAPI coordinator (one deployable application)" {
+ component "Agent ingestion API" as Ingest
+ component "Monitoring query API" as Query
+ component "Token authentication" as Auth
+ component "Host freshness policy" as Fresh
+ component "HTTP check scheduler" as Sched
+ component "Persistence adapters" as Persist
+}
+database SQLite as DB
+cloud "Approved HTTP endpoints" as HTTP
+Ingest --> Auth
+Ingest --> Persist
+Query --> Fresh
+Query --> Persist
+Sched --> Persist
+Sched --> HTTP
+Persist --> DB
+@enduml

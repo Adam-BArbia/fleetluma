@@ -1,0 +1,23 @@
+@startuml 23_seq_host_detail
+actor Operator
+participant Flutter as UI
+participant FastAPI as API
+database SQLite as DB
+Operator -> UI : Select host
+par Host details
+ UI -> API : GET /hosts/{id}
+ API -> DB : current host + sample
+ DB --> API : data
+ API --> UI : host detail
+else History series
+ UI -> API : GET /hosts/{id}/history?window=1h
+ API -> DB : select bounded time range
+ DB --> API : samples
+ API --> UI : chart points
+else Top processes
+ UI -> API : GET /hosts/{id}/processes
+ API -> DB : latest snapshot
+ DB --> API : up to 10 entries
+ API --> UI : processes
+end
+@enduml

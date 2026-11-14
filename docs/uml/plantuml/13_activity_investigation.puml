@@ -1,0 +1,15 @@
+@startuml 13_activity_investigation
+start
+:Open Fleet overview;
+:Select host;
+:Inspect latest CPU, RAM, disk;
+if (Agent data stale?) then (yes)
+ :Show last accepted report time;
+else (no)
+ :Display trends over chosen time range;
+ :Inspect top processes;
+endif
+:Open linked or independent HTTP service;
+:Review latest health check;
+stop
+@enduml

@@ -1,0 +1,14 @@
+@startuml 28_interaction_overview
+start
+:Provision agent A and B;
+:Run initial report interaction;
+:Open mobile fleet interaction;
+:Display live metrics/history/processes;
+:Stop controlled HTTP demo service;
+:Run scheduled check interaction;
+:Observe service UNHEALTHY;
+:Restart service and observe HEALTHY;
+:Stop agent and wait for STALE threshold;
+:Explain that stale agent != powered-off host;
+stop
+@enduml

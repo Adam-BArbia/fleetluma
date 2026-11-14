@@ -1,0 +1,22 @@
+@startuml 08_package
+package agent {
+ class Collector
+ class Reporter
+}
+package coordinator {
+ package api { class AgentRoutes; class MonitoringRoutes }
+ package domain { class HostPolicy; class ServicePolicy }
+ package persistence { class Repository }
+ package worker { class Checker }
+}
+package mobile {
+ class Views
+ class ApiClient
+}
+Reporter ..> AgentRoutes
+MonitoringRoutes ..> Repository
+AgentRoutes ..> Repository
+Checker ..> Repository
+Views ..> ApiClient
+ApiClient ..> MonitoringRoutes
+@enduml

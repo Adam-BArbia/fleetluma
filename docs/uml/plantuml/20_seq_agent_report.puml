@@ -1,0 +1,16 @@
+@startuml 20_seq_agent_report
+actor "Agent" as Agent
+participant "FastAPI /reports" as API
+participant "Token validator" as Auth
+participant "Metrics repository" as DB
+participant "Host registry" as Host
+Agent -> API : POST report + bearer token
+API -> Auth : resolve host(token)
+Auth --> API : host identity
+API -> API : validate sample and bounds
+API -> DB : save metric and process snapshot
+DB --> API : committed
+API -> Host : update lastSeenAt(receive time)
+Host --> API : saved
+API --> Agent : 202 Accepted
+@enduml

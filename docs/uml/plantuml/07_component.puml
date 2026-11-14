@@ -1,0 +1,16 @@
+@startuml 07_component
+component "Agent A\nPython / psutil" as AgentA
+component "Agent B\nPython / psutil" as AgentB
+component "FleetLuma Coordinator\nFastAPI" as Backend
+component "HTTP Check Worker" as Worker
+database "SQLite" as DB
+component "Flutter mobile" as Mobile
+cloud "Approved HTTP endpoints" as Endpoint
+AgentA --> Backend : authenticated report POST
+AgentB --> Backend : authenticated report POST
+Mobile --> Backend : GET monitoring REST API
+Backend --> DB : persist/query
+Worker --> DB : check records
+Backend -- Worker : internal scheduler
+Worker --> Endpoint : HTTP probe
+@enduml

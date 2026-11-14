@@ -1,0 +1,42 @@
+@startuml 03_class_domain
+class Host {
+ +id: UUID
+ +name: String
+ +os: String
+ +lastSeenAt: Instant?
+ +connectionState(now): HostState
+}
+class MetricSample {
+ +receivedAt: Instant
+ +cpuPct: Float
+ +ramUsedBytes: Long
+ +ramTotalBytes: Long
+ +diskUsedBytes: Long
+ +diskTotalBytes: Long
+}
+class ProcessSnapshot { +capturedAt: Instant }
+class ProcessEntry {
+ +pid: Integer
+ +name: String
+ +cpuPct: Float
+ +memoryBytes: Long
+}
+class MonitoredService {
+ +id: UUID
+ +url: URL
+ +enabled: Boolean
+}
+class ServiceCheck {
+ +checkedAt: Instant
+ +httpStatus: Integer?
+ +latencyMs: Float?
+ +result: CheckResult
+}
+enum HostState { PENDING; CONNECTED; STALE }
+enum CheckResult { UNKNOWN; HEALTHY; UNHEALTHY }
+Host "1" -- "0..*" MetricSample
+Host "1" -- "0..1" ProcessSnapshot
+ProcessSnapshot "1" *-- "0..10" ProcessEntry
+Host "0..1" -- "0..*" MonitoredService
+MonitoredService "1" -- "0..*" ServiceCheck
+@enduml

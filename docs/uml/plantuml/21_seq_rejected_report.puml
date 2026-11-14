@@ -1,0 +1,14 @@
+@startuml 21_seq_rejected_report
+actor Agent
+participant API
+participant Auth
+participant Database as DB
+Agent -> API : POST metrics + invalid token
+API -> Auth : authenticate(token)
+Auth --> API : failure
+API --> Agent : 401 Unauthorized
+note right of DB: No samples, host registration or heartbeat update.
+Agent -> API : POST malformed payload + valid token
+API -> API : schema validation fails
+API --> Agent : 422 Unprocessable Entity
+@enduml

@@ -1,0 +1,18 @@
+@startuml 24_seq_http_check
+participant Scheduler
+participant "Health worker" as Worker
+participant "Approved endpoint" as Endpoint
+database SQLite as DB
+Scheduler -> Worker : run scheduled check
+Worker -> Worker : validate preapproved target
+Worker -> Endpoint : HTTP GET (bounded timeout)
+alt successful 2xx/3xx
+ Endpoint --> Worker : code and latency
+ Worker -> DB : persist HEALTHY + latency
+else HTTP failure
+ Endpoint --> Worker : 4xx/5xx
+ Worker -> DB : persist UNHEALTHY + code
+else timeout/network error
+ Worker -> DB : persist UNHEALTHY + error kind
+end
+@enduml
