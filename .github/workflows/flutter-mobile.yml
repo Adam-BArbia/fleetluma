@@ -34,3 +34,13 @@ jobs:
       - name: Build Android debug APK
         working-directory: mobile
         run: flutter build apk --debug --dart-define=FLEETLUMA_API_BASE_URL=http://10.0.2.2:8000
+      - name: Preserve API networking permissions
+        run: |
+          grep -q 'android.permission.INTERNET' mobile/android/app/src/main/AndroidManifest.xml
+          grep -q 'usesCleartextTraffic="true"' mobile/android/app/src/main/AndroidManifest.xml
+      - name: Upload debug APK for local demo testing
+        uses: actions/upload-artifact@v4
+        with:
+          name: fleetluma-android-debug-apk
+          path: mobile/build/app/outputs/flutter-apk/app-debug.apk
+          if-no-files-found: error
