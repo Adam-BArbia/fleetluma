@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
+
+import 'package:http/http.dart' as http;
 
 import '../models/host_snapshot.dart';
 
@@ -7,16 +9,21 @@ abstract class FleetApi {
   Future<List<HostSnapshot>> fetchHosts();
 }
 
-/// Local-lab REST client. The Android app requires an address reachable
-/// from the device, not the device's own 127.0.0.1.
+/// Cross-platform REST client for Android and Flutter Web.
+///
+/// Uses package:http's platform-specific implementation (IO on Android,
+/// BrowserClient on web). The production app never uses mock host records.
 class HttpFleetApi implements FleetApi {
   final Uri baseUri;
   final Duration timeout;
+  final http.Client? _injectedClient;
 
   HttpFleetApi({
     required String baseUrl,
     this.timeout = const Duration(seconds: 5),
-  }) : baseUri = Uri.parse(baseUrl) {
+    http.Client? client,
+  })  : _injectedClient = client,
+        baseUri = Uri.parse(baseUrl) {
     if (!baseUri.hasAuthority ||
         (baseUri.scheme != 'http' && baseUri.scheme != 'https')) {
       throw ArgumentError.value(baseUrl, 'baseUrl', 'Expected HTTP(S) URL');
@@ -25,37 +32,43 @@ class HttpFleetApi implements FleetApi {
 
   @override
   Future<List<HostSnapshot>> fetchHosts() async {
-    final client = HttpClient()..connectionTimeout = timeout;
+    final client = _injectedClient ?? http.Client();
     try {
       final endpoint = baseUri.replace(
         path: '${baseUri.path.replaceFirst(RegExp(r'/$'), '')}/api/v1/hosts',
       );
-      final request = await client.getUrl(endpoint).timeout(timeout);
-      request.headers.set(HttpHeaders.acceptHeader, 'application/json');
-      final response = await request.close().timeout(timeout);
-      final payload = await utf8.decoder.bind(response).join().timeout(timeout);
-      if (response.statusCode != HttpStatus.ok) {
-        throw HttpException('Server returned HTTP ${response.statusCode}');
+      final response = await client
+          .get(endpoint, headers: {'Accept': 'application/json'})
+          .timeout(timeout);
+      if (response.statusCode != 200) {
+        throw FleetConnectionException(
+          'Coordinator returned HTTP ${response.statusCode}.',
+        );
       }
-      final json = jsonDecode(payload) as Map<String, dynamic>;
-      final items = json['items'] as List<dynamic>;
-      return items.map((item) {
-        return HostSnapshot.fromJson(Map<String, dynamic>.from(item as Map));
-      }).toList(growable: false);
-    } on SocketException {
+      final decoded = jsonDecode(response.body);
+      if (decoded is! Map<String, dynamic> || decoded['items'] is! List) {
+        throw const FormatException('Unexpected fleet response shape');
+      }
+      final items = decoded['items'] as List<dynamic>;
+      return items
+          .map((item) => HostSnapshot.fromJson(
+                Map<String, dynamic>.from(item as Map),
+              ))
+          .toList(growable: false);
+    } on TimeoutException {
       throw const FleetConnectionException(
-        'Cannot reach the coordinator. Check its address, firewall, and Wi-Fi.',
+        'Coordinator request timed out. Check the backend address.',
       );
-    } on HandshakeException {
-      throw const FleetConnectionException('Secure connection failed.');
-    } on HttpException catch (error) {
-      throw FleetConnectionException(error.message);
+    } on http.ClientException {
+      throw const FleetConnectionException(
+        'Cannot reach the coordinator. Check your network and backend URL.',
+      );
     } on FormatException {
       throw const FleetConnectionException('The server returned invalid data.');
     } on TypeError {
       throw const FleetConnectionException('Unexpected API response format.');
     } finally {
-      client.close(force: true);
+      if (_injectedClient == null) client.close();
     }
   }
 }
