@@ -1,0 +1,22 @@
+name: Scheduled service checker tests
+on:
+  push:
+    paths: ['supabase/functions/**', '.github/workflows/service-checker.yml']
+  pull_request:
+    paths: ['supabase/functions/**', '.github/workflows/service-checker.yml']
+permissions:
+  contents: read
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+      - name: Normalize source formatting before validation
+        run: deno fmt supabase/functions/fleetluma-checker/
+      - name: Deno static check
+        run: deno check supabase/functions/fleetluma-checker/index.ts
+      - name: Run isolated safe HTTP probe tests
+        run: deno test supabase/functions/fleetluma-checker/checker_test.ts
