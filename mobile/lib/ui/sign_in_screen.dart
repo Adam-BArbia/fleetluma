@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'sign_up_screen.dart';
+
 /// Operator login only. Account provisioning is restricted to project admins.
 class SignInScreen extends StatefulWidget {
   const SignInScreen({super.key});
@@ -23,7 +25,10 @@ class _SignInScreenState extends State<SignInScreen> {
   }
 
   Future<void> _signIn() async {
-    if (_submitting) return;
+    if (_submitting || _email.text.trim().isEmpty || _password.text.isEmpty) {
+      if (mounted) setState(() => _error = 'Enter your email and password.');
+      return;
+    }
     setState(() {
       _submitting = true;
       _error = null;
@@ -103,9 +108,19 @@ class _SignInScreenState extends State<SignInScreen> {
                         child: Text(_submitting ? 'Signing in…' : 'Sign in'),
                       ),
                       const SizedBox(height: 12),
+                      TextButton(
+                        onPressed: _submitting
+                            ? null
+                            : () => Navigator.of(context).push(
+                                  MaterialPageRoute<void>(
+                                    builder: (_) => const SignUpScreen(),
+                                  ),
+                                ),
+                        child: const Text('Create an account / Request access'),
+                      ),
                       const Text(
-                        'Operator accounts are provisioned by the project admin. '
-                        'Self-registration is disabled for this demo.',
+                        'Fleet access requires administrator approval. '
+                        'Agents use separate credentials.',
                         textAlign: TextAlign.center,
                         style: TextStyle(fontSize: 12, color: Colors.white60),
                       ),
