@@ -36,8 +36,21 @@ The top 10 processes are sampled approximately every 30 seconds. It never
 collects process command lines or environments, nor supports commands or
 process termination. A psutil per-process CPU percentage may exceed 100%.
 
-**Lab networking:** HTTP sends bearer credentials in plaintext. Use it only
-on an isolated/trusted LAN with controlled firewall access. Use HTTPS on an
-untrusted network; this project does not implement production deployment.
+**Cloud V1 networking:** always configure `FLEETLUMA_AGENT_CLOUD_MODE=true`
+and a real HTTPS `FLEETLUMA_COORDINATOR_URL`. Each agent has a unique
+server-provisioned bearer token that is never logged or given to operators.
+Remote HTTP is now rejected by default, and HTTP redirects are never followed
+for authenticated report requests. URLs containing credentials, query strings
+or non-root paths are rejected to prevent credential leakage.
+
+**Exception for an isolated LAN classroom demonstration only:** set
+`FLEETLUMA_ALLOW_INSECURE_LAN=true` when an HTTP coordinator is reachable
+through a trusted local network. Do not enable this in cloud deployment.
+Regular local loopback HTTP remains available when cloud mode is off.
+
+Operators sign in separately with Supabase Auth; agent tokens never provide
+permission to access dashboard GET endpoints. Read
+`docs/architecture/FL-18_SIGNUP_AGENT_SECURITY.md` for the final deployment
+security and onboarding design.
 
 See `docs/api/openapi.json` for the canonical payload.
