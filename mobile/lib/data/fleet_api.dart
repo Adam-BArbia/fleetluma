@@ -51,7 +51,7 @@ class HttpFleetApi implements FleetApi {
           .get(endpoint, headers: headers)
           .timeout(timeout);
       if (response.statusCode == 401 && tokenProvider != null) {
-        throw const FleetConnectionException('Session expired. Sign in again.');
+        throw const FleetSessionExpiredException();
       }
       if (response.statusCode == 403 && tokenProvider != null) {
         throw const FleetAccessDeniedException();
