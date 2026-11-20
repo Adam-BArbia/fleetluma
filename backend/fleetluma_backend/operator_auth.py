@@ -65,11 +65,17 @@ def require_operator(authorization: str | None = Header(default=None)):
 def configure_cors(app):
     if cloud_mode():
         origins = [x.strip() for x in os.environ.get("FLEETLUMA_WEB_ORIGINS", "").split(",") if x.strip()]
-        if not origins or any(
-            urlparse(x).scheme != "https" or urlparse(x).path or "*" in x
-            for x in origins
-        ):
-            raise RuntimeError("Cloud CORS requires explicit HTTPS Web origins")
+        # The API preview can precede Flutter Web. With no origins configured,
+        # browser cross-origin access is disabled until an exact Web URL exists.
+        if not origins:
+            return
+        for origin in origins:
+            parsed = urlparse(origin)
+            if (parsed.scheme != "https" or not parsed.hostname or
+                    parsed.username is not None or parsed.password is not None or
+                    parsed.port is not None or parsed.path or parsed.query or parsed.fragment or
+                    "*" in origin or origin != parsed.geturl()):
+                raise RuntimeError("Cloud CORS only accepts explicit HTTPS origins")
         app.add_middleware(CORSMiddleware, allow_origins=origins,
                            allow_credentials=False, allow_methods=["GET","OPTIONS"],
                            allow_headers=["Authorization","Content-Type"])
