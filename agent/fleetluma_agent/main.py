@@ -51,7 +51,9 @@ def send_report(url, token, report, timeout=5):
         headers={"Content-Type": "application/json", "Authorization": "Bearer " + token})
     # urllib normally follows 30x redirects; that would expose bearer tokens
     # to the destination host, including a different domain or HTTP scheme.
-    opener = request.build_opener(NoRedirect())
+    # Ignore inherited HTTP(S)_PROXY settings: agent tokens only go to the
+    # coordinator configured by its administrator, using direct TLS.
+    opener = request.build_opener(request.ProxyHandler({}), NoRedirect())
     with opener.open(req, timeout=timeout) as response:
         if response.status != 202:
             raise RuntimeError("Coordinator rejected report: HTTP " + str(response.status))
