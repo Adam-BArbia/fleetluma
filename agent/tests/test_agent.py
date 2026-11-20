@@ -39,6 +39,26 @@ class AgentTests(unittest.TestCase):
                 "FLEETLUMA_DISK_PATH": "/",
             })
 
+    def test_plain_http_to_public_host_rejected_even_with_opt_in(self):
+        with self.assertRaisesRegex(ValueError, "private IP"):
+            load_config({
+                "FLEETLUMA_COORDINATOR_URL": "http://api.example.org",
+                "FLEETLUMA_AGENT_TOKEN": "random-token-at-least-16-characters",
+                "FLEETLUMA_DISK_PATH": "/",
+                "FLEETLUMA_ALLOW_INSECURE_LAN": "true",
+            })
+
+    def test_url_must_not_embed_userinfo_or_query(self):
+        for url in ("https://user:secret@api.example.org",
+                    "https://api.example.org/?secret=bad"):
+            with self.subTest(url=url):
+                with self.assertRaisesRegex(ValueError, "origin"):
+                    load_config({
+                        "FLEETLUMA_COORDINATOR_URL": url,
+                        "FLEETLUMA_AGENT_TOKEN": "random-token-at-least-16-characters",
+                        "FLEETLUMA_DISK_PATH": "/",
+                    })
+
     def test_cloud_mode_disallows_even_local_http(self):
         with self.assertRaisesRegex(ValueError, "requires HTTPS"):
             load_config({
