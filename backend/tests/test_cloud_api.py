@@ -85,3 +85,33 @@ def test_health_rejects_failed_database_probe(environment):
         def ping(self): return False
     client = TestClient(create_cloud_app(store_factory=DownStore))
     assert client.get("/health").status_code == 503
+
+
+def test_agent_credential_cannot_open_operator_dashboard(environment, monkeypatch):
+    from fleetluma_backend import operator_auth
+    import jwt
+
+    class RejectAgentAsJwt:
+        def get_signing_key_from_jwt(self, token):
+            raise jwt.DecodeError("agent token is not an operator JWT")
+
+    monkeypatch.setattr(operator_auth, "jwks_client",
+                        lambda _: RejectAgentAsJwt())
+    client = TestClient(create_cloud_app(store_factory=FakeStore))
+    result = client.get("/api/v1/hosts", headers={
+        "Authorization": "Bearer ci-fleetluma-agent-valid-token"
+    })
+    assert result.status_code == 401
+
+
+def test_operator_jwt_cannot_post_agent_report(environment):
+    client = TestClient(create_cloud_app(store_factory=FakeStore))
+    payload = {
+        "sampled_at": "2026-11-14T12:00:00Z",
+        "metrics": {"cpu_pct": 20, "ram_used_bytes": 100,
+                    "ram_total_bytes": 1000, "disk_path": "/",
+                    "disk_used_bytes": 250, "disk_total_bytes": 500},
+    }
+    result = client.post("/api/v1/agent/reports", json=payload,
+                         headers={"Authorization": "Bearer operator-jwt-not-agent"})
+    assert result.status_code == 401
