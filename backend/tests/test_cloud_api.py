@@ -85,3 +85,30 @@ def test_health_rejects_failed_database_probe(environment):
         def ping(self): return False
     client = TestClient(create_cloud_app(store_factory=DownStore))
     assert client.get("/health").status_code == 503
+
+
+def test_cloud_api_only_preview_disables_cors_until_web_origin_known(environment, monkeypatch):
+    monkeypatch.delenv("FLEETLUMA_WEB_ORIGINS", raising=False)
+    client = TestClient(create_cloud_app(store_factory=FakeStore))
+    assert client.get("/health").status_code == 200
+    assert client.get("/api/v1/hosts").status_code == 401
+    response = client.options("/api/v1/hosts", headers={
+        "Origin": "https://untrusted.example.test",
+        "Access-Control-Request-Method": "GET",
+    })
+    assert "access-control-allow-origin" not in response.headers
+
+
+@pytest.mark.parametrize("origin", [
+    "http://fleetluma.example.test",
+    "https://user@fleetluma.example.test",
+    "https://fleetluma.example.test:8443",
+    "https://fleetluma.example.test/path",
+    "https://fleetluma.example.test?token=value",
+    "https://fleetluma.example.test#part",
+    "https://*.example.test",
+])
+def test_cloud_cors_rejects_invalid_origins(environment, monkeypatch, origin):
+    monkeypatch.setenv("FLEETLUMA_WEB_ORIGINS", origin)
+    with pytest.raises(RuntimeError, match="CORS"):
+        create_cloud_app(store_factory=FakeStore)
