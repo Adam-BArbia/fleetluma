@@ -1,0 +1,157 @@
+# FL-20: manually approved FleetLuma Web preview, never production.
+# Architecture: docs/uml/plantuml/30_cloud_deployment.puml.
+# The API, database, auth and checker must be configured independently.
+name: FleetLuma cloud Web preview
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/cloud-web-preview.yml'
+      - 'scripts/verify_cloud_preview.py'
+      - 'scripts/test_verify_cloud_preview.py'
+  workflow_dispatch:
+    inputs:
+      api_origin:
+        description: 'Deployed and secured HTTPS FleetLuma API preview origin (.vercel.app), no path'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fleetluma-cloud-web-preview-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  preview-contract:
+    name: Verify cloud preview safety contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: '3.12'
+      - name: Check unauthenticated preview contract tests
+        run: python -m unittest -v scripts.test_verify_cloud_preview
+      - name: Assert final cloud diagram exists
+        run: |
+          test -s docs/uml/plantuml/30_cloud_deployment.puml
+          grep -q 'Vercel' docs/uml/plantuml/30_cloud_deployment.puml
+          grep -q 'PostgreSQL' docs/uml/plantuml/30_cloud_deployment.puml
+
+  deploy-web-preview:
+    name: Build Flutter Web and publish protected preview
+    # No deployments from PRs or non-main refs; explicit dispatch only.
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' }}
+    needs: preview-contract
+    runs-on: ubuntu-latest
+    environment: fleetluma-preview
+    timeout-minutes: 30
+    env:
+      FLEETLUMA_API_ORIGIN: ${{ inputs.api_origin }}
+      FLEETLUMA_SUPABASE_URL: ${{ vars.FLEETLUMA_SUPABASE_URL }}
+      FLEETLUMA_SUPABASE_PUBLISHABLE_KEY: ${{ vars.FLEETLUMA_SUPABASE_PUBLISHABLE_KEY }}
+      VERCEL_CLI_VERSION: ${{ vars.VERCEL_CLI_VERSION }}
+      VERCEL_ORG_ID: team_YUKwBQPQzZXgHdSI209B8ZJJ
+      VERCEL_PROJECT_ID: prj_HJbg7XUp7GRVPATZpgvbB4HeXTU7
+    steps:
+      - name: Fail closed before accessing source or building
+        env:
+          DEPLOY_TOKEN_PRESENT: ${{ secrets.VERCEL_TOKEN != '' }}
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import os, re
+          from urllib.parse import urlsplit
+
+          required = ('FLEETLUMA_API_ORIGIN', 'FLEETLUMA_SUPABASE_URL',
+                      'FLEETLUMA_SUPABASE_PUBLISHABLE_KEY', 'VERCEL_CLI_VERSION')
+          missing = [key for key in required if not os.environ.get(key)]
+          if missing:
+              raise SystemExit('Missing required preview environment variables: ' + ', '.join(missing))
+          if os.environ.get('DEPLOY_TOKEN_PRESENT') != 'true':
+              raise SystemExit('Missing VERCEL_TOKEN in the protected fleetluma-preview environment')
+
+          def https_origin(value, required_domain):
+              p = urlsplit(value)
+              if (p.scheme != 'https' or not p.hostname or
+                  not p.hostname.endswith(required_domain) or
+                  p.username or p.password or p.port or p.path not in ('', '/') or
+                  p.query or p.fragment):
+                  raise SystemExit('Invalid HTTPS preview origin; must be an origin with no path/query')
+
+          https_origin(os.environ['FLEETLUMA_API_ORIGIN'], '.vercel.app')
+          https_origin(os.environ['FLEETLUMA_SUPABASE_URL'], '.supabase.co')
+          if not os.environ['FLEETLUMA_SUPABASE_PUBLISHABLE_KEY'].startswith('sb_publishable_'):
+              raise SystemExit('Use a public Supabase publishable key; never a service-role key')
+          if not re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+', os.environ['VERCEL_CLI_VERSION']):
+              raise SystemExit('Pin VERCEL_CLI_VERSION to an exact numeric version')
+          print('PASS: preview-only release configuration is present and structurally safe')
+          PY
+
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.50.0'
+          channel: stable
+          cache: true
+      - name: Generate Flutter Web scaffold
+        working-directory: mobile
+        run: flutter create --platforms=web --project-name fleetluma .
+      - name: Resolve dependencies, analyze, test
+        working-directory: mobile
+        run: |
+          flutter pub get
+          flutter analyze
+          flutter test
+      - name: Build release Web with actual public HTTPS endpoints
+        working-directory: mobile
+        shell: bash
+        run: |
+          flutter build web --release \
+            --dart-define=FLEETLUMA_CLOUD_MODE=true \
+            --dart-define=FLEETLUMA_API_BASE_URL="$FLEETLUMA_API_ORIGIN" \
+            --dart-define=FLEETLUMA_SUPABASE_URL="$FLEETLUMA_SUPABASE_URL" \
+            --dart-define=FLEETLUMA_SUPABASE_PUBLISHABLE_KEY="$FLEETLUMA_SUPABASE_PUBLISHABLE_KEY"
+
+      - name: Package Vercel Build Output API v3 static artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s mobile/build/web/index.html
+          mkdir -p .vercel/output/static
+          cp -a mobile/build/web/. .vercel/output/static/
+          cat > .vercel/output/config.json <<'JSON'
+          {"version":3,"routes":[{"handle":"filesystem"},{"src":"/(.*)","dest":"/index.html"}]}
+          JSON
+          mkdir -p .vercel
+          cat > .vercel/project.json <<'JSON'
+          {"orgId":"team_YUKwBQPQzZXgHdSI209B8ZJJ","projectId":"prj_HJbg7XUp7GRVPATZpgvbB4HeXTU7"}
+          JSON
+          python3 -m json.tool .vercel/output/config.json >/dev/null
+          python3 -m json.tool .vercel/project.json >/dev/null
+          test -s .vercel/output/static/main.dart.js
+          echo 'PASS: static build output conforms to Vercel v3 directory contract'
+
+      - name: Deploy to Vercel PREVIEW only (no production flag)
+        id: deploy
+        shell: bash
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          set -euo pipefail
+          npm install --global "vercel@${VERCEL_CLI_VERSION}"
+          url="$(vercel deploy --prebuilt --yes)"
+          DEPLOY_URL="$url" python3 - <<'PY'
+          import os
+          from urllib.parse import urlsplit
+          u = urlsplit(os.environ['DEPLOY_URL'])
+          if u.scheme != 'https' or not (u.hostname or '').endswith('.vercel.app'):
+              raise SystemExit('Vercel did not return a valid HTTPS preview URL')
+          PY
+          printf '### FleetLuma Web preview\n\n- URL: %s\n- Target: **Preview (not production)**\n- Source: \`%s\`\n- API origin: %s\n\n**NOT an end-to-end acceptance test.** Verify Vercel protection, authenticated API requests, PostgreSQL persistence, and agent ingestion before release.\n' "$url" "$GITHUB_SHA" "$FLEETLUMA_API_ORIGIN" >> "$GITHUB_STEP_SUMMARY"
