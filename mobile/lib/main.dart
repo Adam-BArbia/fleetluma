@@ -81,6 +81,22 @@ class _CloudAuthGate extends StatefulWidget {
 
 class _CloudAuthGateState extends State<_CloudAuthGate> {
   StreamSubscription<AuthState>? _authSubscription;
+  String? _verifiedForToken;
+  Future<void>? _permissionCheck;
+
+  Future<void> _verifyOperator(String token) async {
+    await HttpFleetApi(
+      baseUrl: apiBaseUrl,
+      tokenProvider: () async => token,
+    ).fetchHosts();
+  }
+
+  void _retryAuthorization() {
+    setState(() {
+      _permissionCheck = null;
+      _verifiedForToken = null;
+    });
+  }
 
   @override
   void initState() {
@@ -105,8 +121,75 @@ class _CloudAuthGateState extends State<_CloudAuthGate> {
     if (session == null) {
       return const SignInScreen();
     }
-    return FleetScreen(
-      key: ValueKey(session.user.id),
+    // Authentication alone is insufficient. A signed-in user can exist in
+    // Supabase without being on the backend operator allowlist.
+    final accessToken = session.accessToken;
+    if (_permissionCheck == null || _verifiedForToken != accessToken) {
+      _verifiedForToken = accessToken;
+      _permissionCheck = _verifyOperator(accessToken);
+    }
+    return FutureBuilder<void>(
+      future: _permissionCheck,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+        if (snapshot.hasError) {
+          final rejected = snapshot.error is FleetAccessDeniedException;
+          final expired = snapshot.error is FleetSessionExpiredException;
+          return Scaffold(
+            appBar: AppBar(title: const Text('FleetLuma account access')),
+            body: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 430),
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(rejected ? Icons.lock_person_outlined : Icons.cloud_off_outlined,
+                          size: 48),
+                      const SizedBox(height: 16),
+                      Text(
+                        rejected
+                            ? 'Waiting for operator approval'
+                            : expired
+                                ? 'Your session needs to be renewed'
+                                : 'Unable to verify access',
+                        textAlign: TextAlign.center,
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        rejected
+                            ? 'Your Supabase account is signed in but your FleetLuma '
+                              'operator ID has not been approved by an administrator.'
+                            : 'The protected FleetLuma API could not confirm your '
+                              'permissions. No monitoring data was loaded.',
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 24),
+                      OutlinedButton(
+                        onPressed: _retryAuthorization,
+                        child: const Text('Retry verification'),
+                      ),
+                      TextButton(
+                        onPressed: () async {
+                          await Supabase.instance.client.auth.signOut();
+                        },
+                        child: const Text('Sign out'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          );
+        }
+        return FleetScreen(
+          key: ValueKey(session.user.id),
       controller: FleetController(
         api: HttpFleetApi(
           baseUrl: apiBaseUrl,
@@ -114,7 +197,9 @@ class _CloudAuthGateState extends State<_CloudAuthGate> {
         ),
       ),
       apiUrl: apiBaseUrl,
-      onSignOut: () async => auth.signOut(),
+          onSignOut: () async => auth.signOut(),
+        );
+      },
     );
   }
 }
