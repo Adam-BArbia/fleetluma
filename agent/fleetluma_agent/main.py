@@ -2,6 +2,7 @@
 import json
 import logging
 import os
+from ipaddress import ip_address, ip_network
 import sys
 import time
 from pathlib import Path
@@ -20,14 +21,26 @@ def load_config(env=None):
     if not url or len(token) < 16 or token.startswith("REPLACE_"):
         raise ValueError("Set FLEETLUMA_COORDINATOR_URL and a real unique agent token")
     parts = urlsplit(url)
-    if parts.scheme not in {"http", "https"} or not parts.netloc:
-        raise ValueError("Coordinator must have an HTTP(S) URL")
+    if (parts.scheme not in {"http", "https"} or not parts.netloc
+            or parts.username or parts.password or parts.query or parts.fragment
+            or parts.path not in ("", "/")):
+        raise ValueError("Coordinator must have an HTTP(S) origin without credentials or paths")
     if parts.scheme == "http":
         if env.get("FLEETLUMA_MODE") == "cloud" or env.get("FLEETLUMA_REQUIRE_HTTPS") == "true":
             raise ValueError("Cloud agent reporting requires HTTPS")
         if parts.hostname not in {"127.0.0.1", "localhost"}:
             if env.get("FLEETLUMA_ALLOW_INSECURE_LAN") != "true":
                 raise ValueError("Non-loopback HTTP is disabled by default; use HTTPS")
+            # Even the explicit lab exception must target a numeric RFC1918 IP.
+            # No public or DNS-rebound endpoint may receive plaintext tokens.
+            try:
+                addr = ip_address(parts.hostname)
+            except ValueError:
+                raise ValueError("HTTP lab coordinator must use a private IP address") from None
+            private_lan = any(addr in ip_network(cidr) for cidr in
+                ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"))
+            if not private_lan:
+                raise ValueError("HTTP lab coordinator must use a private IP address")
             LOG.warning("Unsafe HTTP LAN mode explicitly enabled; agent bearer tokens are unencrypted")
     disk = env.get("FLEETLUMA_DISK_PATH", os.path.abspath(os.sep))
     if not Path(disk).exists():
