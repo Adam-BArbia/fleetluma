@@ -1,0 +1,64 @@
+{
+  "schemaVersion": 1,
+  "project": "FleetLuma",
+  "jiraIssue": "FL-21",
+  "title": "FleetLuma — V1 UI Mockups + Clickable Prototype (FL-21)",
+  "fileKey": "6ma0f4jjB4Rtxnt25zBAdr",
+  "sourceUrl": "https://www.figma.com/design/6ma0f4jjB4Rtxnt25zBAdr",
+  "editableSource": "figma-cloud",
+  "nativeFigBackupCommitted": false,
+  "illustrativeData": true,
+  "verifiedPresentationMode": false,
+  "prototypeNavigation": "ON_CLICK NAVIGATE interactions added; needs final manual review",
+  "screens": {
+    "mobile": [
+      {
+        "name": "Fleet Overview",
+        "nodeId": "1:34"
+      },
+      {
+        "name": "Host Details",
+        "nodeId": "1:77"
+      },
+      {
+        "name": "Top Processes",
+        "nodeId": "1:143"
+      },
+      {
+        "name": "HTTP Checks",
+        "nodeId": "1:181"
+      },
+      {
+        "name": "Cloud Operator Login",
+        "nodeId": "1:229"
+      },
+      {
+        "name": "Edge States",
+        "nodeId": "1:263"
+      }
+    ],
+    "desktop": [
+      {
+        "name": "Fleet Overview",
+        "nodeId": "2:50"
+      },
+      {
+        "name": "Host Details",
+        "nodeId": "2:138"
+      },
+      {
+        "name": "Top Processes",
+        "nodeId": "2:218"
+      },
+      {
+        "name": "HTTP Checks",
+        "nodeId": "2:291"
+      },
+      {
+        "name": "Cloud Operator Login",
+        "nodeId": "2:374"
+      }
+    ]
+  },
+  "recommendedArchivePath": "docs/design/FleetLuma_V1_UI_Mockups.fig"
+}
