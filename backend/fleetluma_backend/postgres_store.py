@@ -27,7 +27,8 @@ def connection():
     if not url:
         raise RuntimeError("FLEETLUMA_DATABASE_URL missing (server-side only)")
     # Supabase transaction-pooler DSN recommended; require TLS.
-    with psycopg.connect(url, row_factory=dict_row, connect_timeout=5, sslmode="require") as conn:
+    with psycopg.connect(url, row_factory=dict_row, connect_timeout=5, sslmode="require",
+                         prepare_threshold=None) as conn:
         yield conn
 
 
@@ -43,11 +44,20 @@ class PostgresStore:
         self._connect = connect
 
     def ping(self):
-        """Readiness probe: fixed harmless SQL, no user-controlled query."""
+        """Readiness requires private schema/table SELECT grants as well as a live DB."""
         with self._connect() as conn:
             with conn.cursor() as cur:
-                cur.execute("SELECT 1 AS alive")
-                return cur.fetchone()["alive"] == 1
+                cur.execute("""
+                    SELECT (
+                        has_schema_privilege(current_user, 'fleetluma', 'USAGE')
+                        AND has_table_privilege(current_user, 'fleetluma.hosts', 'SELECT')
+                        AND has_table_privilege(current_user, 'fleetluma.samples', 'SELECT')
+                        AND has_table_privilege(current_user, 'fleetluma.process_snapshots', 'SELECT')
+                        AND has_table_privilege(current_user, 'fleetluma.services', 'SELECT')
+                        AND has_table_privilege(current_user, 'fleetluma.service_checks', 'SELECT')
+                    ) AS ready
+                """)
+                return cur.fetchone()["ready"] is True
 
     def provision_host(self, host_id, name, os_name, token):
         """Provision explicitly from privileged backend control path, never user GET."""
