@@ -52,6 +52,42 @@ void main() {
     mock.close();
   });
 
+
+  test('Cloud fleet shows approval guidance on HTTP 403', () async {
+    final mock = MockClient((request) async {
+      expect(request.headers['Authorization'], 'Bearer operator-jwt');
+      return http.Response('{"error":"FORBIDDEN"}', 403);
+    });
+    final api = HttpFleetApi(
+      baseUrl: 'https://api.example.test',
+      client: mock,
+      tokenProvider: () async => 'operator-jwt',
+    );
+    await expectLater(
+      api.fetchHosts(),
+      throwsA(isA<FleetConnectionException>().having(
+        (error) => error.message, 'message', contains('not yet approved'),
+      )),
+    );
+    mock.close();
+  });
+
+  test('Cloud fleet handles HTTP 401 as an expired session', () async {
+    final mock = MockClient((request) async => http.Response('', 401));
+    final api = HttpFleetApi(
+      baseUrl: 'https://api.example.test',
+      client: mock,
+      tokenProvider: () async => 'expired-operator-jwt',
+    );
+    await expectLater(
+      api.fetchHosts(),
+      throwsA(isA<FleetConnectionException>().having(
+        (error) => error.message, 'message', contains('Session expired'),
+      )),
+    );
+    mock.close();
+  });
+
   test('Rejects malformed backend URL', () {
     expect(
       () => HttpFleetApi(baseUrl: 'nope'),

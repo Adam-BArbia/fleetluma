@@ -50,6 +50,14 @@ class HttpFleetApi implements FleetApi {
       final response = await client
           .get(endpoint, headers: headers)
           .timeout(timeout);
+      if (response.statusCode == 401 && tokenProvider != null) {
+        throw const FleetConnectionException('Session expired. Sign in again.');
+      }
+      if (response.statusCode == 403 && tokenProvider != null) {
+        throw const FleetConnectionException(
+          'Your account is not yet approved to view this fleet. Contact the fleet administrator.',
+        );
+      }
       if (response.statusCode != 200) {
         throw FleetConnectionException(
           'Coordinator returned HTTP ${response.statusCode}.',

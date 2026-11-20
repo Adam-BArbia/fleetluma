@@ -7,12 +7,15 @@ import 'data/fleet_api.dart';
 import 'state/fleet_controller.dart';
 import 'ui/fleet_screen.dart';
 import 'ui/sign_in_screen.dart';
+import 'ui/sign_up_screen.dart';
 
 const apiBaseUrl = String.fromEnvironment(
   'FLEETLUMA_API_BASE_URL',
   defaultValue: 'http://10.0.2.2:8000',
 );
 const cloudMode = bool.fromEnvironment('FLEETLUMA_CLOUD_MODE');
+// UI feature gate, NOT an authorization boundary. Set Supabase Auth policy separately.
+const registrationEnabled = bool.fromEnvironment('FLEETLUMA_ALLOW_SIGN_UP');
 const supabaseUrl = String.fromEnvironment('FLEETLUMA_SUPABASE_URL');
 const supabasePublishableKey = String.fromEnvironment(
   'FLEETLUMA_SUPABASE_PUBLISHABLE_KEY',
@@ -81,6 +84,7 @@ class _CloudAuthGate extends StatefulWidget {
 
 class _CloudAuthGateState extends State<_CloudAuthGate> {
   StreamSubscription<AuthState>? _authSubscription;
+  bool _showSignUp = false;
 
   @override
   void initState() {
@@ -102,8 +106,19 @@ class _CloudAuthGateState extends State<_CloudAuthGate> {
   Widget build(BuildContext context) {
     final auth = Supabase.instance.client.auth;
     final session = auth.currentSession;
+    // Keep the registration form mounted even if the Auth provider briefly
+    // issues a new session before email confirmation or explicit sign-out.
+    if (_showSignUp) {
+      return SignUpScreen(
+        registrationEnabled: registrationEnabled,
+        onBackToSignIn: () => setState(() => _showSignUp = false),
+      );
+    }
     if (session == null) {
-      return const SignInScreen();
+      return SignInScreen(
+        registrationEnabled: registrationEnabled,
+        onCreateAccount: () => setState(() => _showSignUp = true),
+      );
     }
     return FleetScreen(
       key: ValueKey(session.user.id),
