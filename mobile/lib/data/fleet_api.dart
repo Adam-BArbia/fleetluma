@@ -50,6 +50,12 @@ class HttpFleetApi implements FleetApi {
       final response = await client
           .get(endpoint, headers: headers)
           .timeout(timeout);
+      if (response.statusCode == 401) {
+        throw const FleetSessionExpiredException();
+      }
+      if (response.statusCode == 403) {
+        throw const FleetAccessDeniedException();
+      }
       if (response.statusCode != 200) {
         throw FleetConnectionException(
           'Coordinator returned HTTP ${response.statusCode}.',
@@ -89,4 +95,16 @@ class FleetConnectionException implements Exception {
 
   @override
   String toString() => message;
+}
+
+/// A valid or syntactically present session was not accepted by the API.
+class FleetSessionExpiredException extends FleetConnectionException {
+  const FleetSessionExpiredException()
+      : super('Your session expired. Please sign in again.');
+}
+
+/// The signed-in user is not an approved FleetLuma operator.
+class FleetAccessDeniedException extends FleetConnectionException {
+  const FleetAccessDeniedException()
+      : super('This account has not been approved to view fleet data.');
 }
