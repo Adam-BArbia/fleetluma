@@ -85,6 +85,20 @@ class _CloudAuthGate extends StatefulWidget {
 class _CloudAuthGateState extends State<_CloudAuthGate> {
   StreamSubscription<AuthState>? _authSubscription;
   bool _showSignUp = false;
+  String? _authorizedToken;
+  Future<void>? _authorization;
+
+  Future<void> _checkOperatorAccess(String token) async {
+    await HttpFleetApi(baseUrl: apiBaseUrl, tokenProvider: () async => token)
+        .fetchHosts();
+  }
+
+  void _retryAccess() {
+    setState(() {
+      _authorizedToken = null;
+      _authorization = null;
+    });
+  }
 
   @override
   void initState() {
@@ -120,16 +134,83 @@ class _CloudAuthGateState extends State<_CloudAuthGate> {
         onCreateAccount: () => setState(() => _showSignUp = true),
       );
     }
-    return FleetScreen(
-      key: ValueKey(session.user.id),
-      controller: FleetController(
-        api: HttpFleetApi(
-          baseUrl: apiBaseUrl,
-          tokenProvider: () async => auth.currentSession?.accessToken,
-        ),
-      ),
-      apiUrl: apiBaseUrl,
-      onSignOut: () async => auth.signOut(),
+    // A Supabase session does not imply FleetLuma operator approval.
+    // Do not mount FleetScreen (or begin polling) until the API approves it.
+    final token = session.accessToken;
+    if (_authorization == null || _authorizedToken != token) {
+      _authorizedToken = token;
+      _authorization = _checkOperatorAccess(token);
+    }
+    return FutureBuilder<void>(
+      future: _authorization,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+        if (snapshot.hasError) {
+          final denied = snapshot.error is FleetAccessDeniedException;
+          final expired = snapshot.error is FleetSessionExpiredException;
+          return Scaffold(
+            appBar: AppBar(title: const Text('FleetLuma account access')),
+            body: Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 440),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.lock_person_outlined, size: 52),
+                      const SizedBox(height: 16),
+                      Text(
+                        denied
+                            ? 'Waiting for operator approval'
+                            : expired
+                                ? 'Your session needs to be renewed'
+                                : 'Unable to verify access',
+                        style: Theme.of(context).textTheme.titleLarge,
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 12),
+                      Text(
+                        denied
+                            ? 'Your account exists but has not been approved to view monitoring data.'
+                            : expired
+                                ? 'Sign in again to refresh your session.'
+                                : 'The monitoring service could not confirm your access. Try again later.',
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 20),
+                      FilledButton(
+                        onPressed: _retryAccess,
+                        child: const Text('Retry access check'),
+                      ),
+                      const SizedBox(height: 10),
+                      OutlinedButton(
+                        onPressed: () async => auth.signOut(),
+                        child: const Text('Sign out'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          );
+        }
+        return FleetScreen(
+          key: ValueKey(session.user.id),
+          controller: FleetController(
+            api: HttpFleetApi(
+              baseUrl: apiBaseUrl,
+              tokenProvider: () async => auth.currentSession?.accessToken,
+            ),
+          ),
+          apiUrl: apiBaseUrl,
+          onSignOut: () async => auth.signOut(),
+        );
+      },
     );
   }
 }

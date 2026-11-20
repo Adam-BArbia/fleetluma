@@ -43,7 +43,7 @@ class HttpFleetApi implements FleetApi {
       if (tokenProvider != null) {
         final jwt = await tokenProvider!();
         if (jwt == null || jwt.isEmpty) {
-          throw const FleetConnectionException('Session expired. Sign in again.');
+          throw const FleetSessionExpiredException();
         }
         headers['Authorization'] = 'Bearer $jwt';
       }
@@ -51,12 +51,10 @@ class HttpFleetApi implements FleetApi {
           .get(endpoint, headers: headers)
           .timeout(timeout);
       if (response.statusCode == 401 && tokenProvider != null) {
-        throw const FleetConnectionException('Session expired. Sign in again.');
+        throw const FleetSessionExpiredException();
       }
       if (response.statusCode == 403 && tokenProvider != null) {
-        throw const FleetConnectionException(
-          'Your account is not yet approved to view this fleet. Contact the fleet administrator.',
-        );
+        throw const FleetAccessDeniedException();
       }
       if (response.statusCode != 200) {
         throw FleetConnectionException(
@@ -97,4 +95,14 @@ class FleetConnectionException implements Exception {
 
   @override
   String toString() => message;
+}
+
+class FleetSessionExpiredException extends FleetConnectionException {
+  const FleetSessionExpiredException()
+      : super('Session expired. Sign in again.');
+}
+
+class FleetAccessDeniedException extends FleetConnectionException {
+  const FleetAccessDeniedException()
+      : super('Your account is not yet approved to view this fleet. Contact the fleet administrator.');
 }
