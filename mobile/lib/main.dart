@@ -106,16 +106,19 @@ class _CloudAuthGateState extends State<_CloudAuthGate> {
   Widget build(BuildContext context) {
     final auth = Supabase.instance.client.auth;
     final session = auth.currentSession;
+    // Keep the registration form mounted even if the Auth provider briefly
+    // issues a new session before email confirmation or explicit sign-out.
+    if (_showSignUp) {
+      return SignUpScreen(
+        registrationEnabled: registrationEnabled,
+        onBackToSignIn: () => setState(() => _showSignUp = false),
+      );
+    }
     if (session == null) {
-      return _showSignUp
-          ? SignUpScreen(
-              registrationEnabled: registrationEnabled,
-              onBackToSignIn: () => setState(() => _showSignUp = false),
-            )
-          : SignInScreen(
-              registrationEnabled: registrationEnabled,
-              onCreateAccount: () => setState(() => _showSignUp = true),
-            );
+      return SignInScreen(
+        registrationEnabled: registrationEnabled,
+        onCreateAccount: () => setState(() => _showSignUp = true),
+      );
     }
     return FleetScreen(
       key: ValueKey(session.user.id),
