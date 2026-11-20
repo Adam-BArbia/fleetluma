@@ -35,4 +35,32 @@ void main() {
     expect(called, isFalse);
     mock.close();
   });
+
+  test('HTTP 403 raises explicit operator approval error', () async {
+    final mock = MockClient((request) async {
+      expect(request.headers['Authorization'], 'Bearer signed-test-token');
+      return http.Response('{"error":{"code":"FORBIDDEN"}}', 403);
+    });
+    final client = HttpFleetApi(
+      baseUrl: 'https://api.example.test',
+      client: mock,
+      tokenProvider: () async => 'signed-test-token',
+    );
+    await expectLater(client.fetchHosts(),
+        throwsA(isA<FleetAccessDeniedException>()));
+    mock.close();
+  });
+
+  test('HTTP 401 raises session-expired error', () async {
+    final mock = MockClient((request) async => http.Response('{}', 401));
+    final client = HttpFleetApi(
+      baseUrl: 'https://api.example.test',
+      client: mock,
+      tokenProvider: () async => 'invalid-token',
+    );
+    await expectLater(client.fetchHosts(),
+        throwsA(isA<FleetSessionExpiredException>()));
+    mock.close();
+  });
+
 }
