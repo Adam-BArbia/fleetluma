@@ -3,7 +3,10 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 
 /// Operator login only. Account provisioning is restricted to project admins.
 class SignInScreen extends StatefulWidget {
-  const SignInScreen({super.key});
+  final bool registrationEnabled;
+  final VoidCallback onCreateAccount;
+
+  const SignInScreen({super.key, required this.registrationEnabled, required this.onCreateAccount});
 
   @override
   State<SignInScreen> createState() => _SignInScreenState();
@@ -103,9 +106,18 @@ class _SignInScreenState extends State<SignInScreen> {
                         child: Text(_submitting ? 'Signing in…' : 'Sign in'),
                       ),
                       const SizedBox(height: 12),
+                      const SizedBox(height: 10),
+                      OutlinedButton.icon(
+                        onPressed: widget.onCreateAccount,
+                        icon: const Icon(Icons.person_add_alt_outlined),
+                        label: Text(widget.registrationEnabled
+                            ? 'Create an account'
+                            : 'Request an account'),
+                      ),
+                      const SizedBox(height: 12),
                       const Text(
-                        'Operator accounts are provisioned by the project admin. '
-                        'Self-registration is disabled for this demo.',
+                        'Only approved operators can view FleetLuma monitoring data. '
+                        'Agent credentials are separate from operator accounts.',
                         textAlign: TextAlign.center,
                         style: TextStyle(fontSize: 12, color: Colors.white60),
                       ),
