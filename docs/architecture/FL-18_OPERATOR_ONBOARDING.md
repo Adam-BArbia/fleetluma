@@ -36,6 +36,21 @@ Before a live sign-in, verify that the project's Supabase Auth signing key is as
 - Local SQLite fallback permits HTTP on loopback. An explicitly insecure local LAN exception requires `FLEETLUMA_ALLOW_INSECURE_LAN=true` and a numeric RFC1918 IPv4 address; never use this on campus Wi-Fi or for cloud release evidence.
 - Rotate compromised tokens through a reviewed privileged backend operation and reject old credentials. No process execution or remote kill API.
 
+### Privileged enrollment command (Linux/WSL operator workstation)
+
+Run from `backend/` using a private Supabase Postgres pooled DSN set only in your shell/secret manager. The CLI never exposes an enrollment HTTP endpoint.
+
+```bash
+export FLEETLUMA_MODE=cloud
+# Set FLEETLUMA_DATABASE_URL privately in the secure administrator environment.
+mkdir -p ~/.config/fleetluma
+chmod 700 ~/.config/fleetluma
+python -m fleetluma_backend.provision_agent --name workstation-01 --os windows --token-file ~/.config/fleetluma/workstation-01.json
+```
+
+The command prints only the new host UUID and the **file path**, not the raw credential. It creates the token file exactly once with POSIX `0600` permissions, generates a cryptographically random token, and uses `PostgresStore.provision_host()` to store only its SHA-256 hash. If database enrollment fails it removes the newly written token file. Move the file to the intended physical host through a trusted channel, set `FLEETLUMA_AGENT_TOKEN` from its `agent_token` entry, secure that copy, and delete the source copy.
+
+Windows-only administrator terminals are intentionally refused by this CLI because POSIX file modes cannot promise Windows ACL security. Use WSL/Linux for enrollment. Never print, paste, upload, or screenshot token contents.
 ## Release verification: mandatory, not yet complete
 
 - [ ] Anonymous GET 401; invalid/expired/wrong-issuer JWT 401; unapproved operator 403; approved operator GET 200.
