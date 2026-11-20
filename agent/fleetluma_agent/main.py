@@ -17,13 +17,18 @@ def load_config(env=None):
     env = env or os.environ
     url = env.get("FLEETLUMA_COORDINATOR_URL", "").rstrip("/")
     token = env.get("FLEETLUMA_AGENT_TOKEN", "")
-    if not url or not token or token.startswith("REPLACE_"):
+    if not url or len(token) < 16 or token.startswith("REPLACE_"):
         raise ValueError("Set FLEETLUMA_COORDINATOR_URL and a real unique agent token")
     parts = urlsplit(url)
     if parts.scheme not in {"http", "https"} or not parts.netloc:
         raise ValueError("Coordinator must have an HTTP(S) URL")
-    if parts.scheme == "http" and parts.hostname not in {"127.0.0.1", "localhost"}:
-        LOG.warning("Plain HTTP reveals agent tokens on the network; use only a trusted lab LAN")
+    if parts.scheme == "http":
+        if env.get("FLEETLUMA_MODE") == "cloud" or env.get("FLEETLUMA_REQUIRE_HTTPS") == "true":
+            raise ValueError("Cloud agent reporting requires HTTPS")
+        if parts.hostname not in {"127.0.0.1", "localhost"}:
+            if env.get("FLEETLUMA_ALLOW_INSECURE_LAN") != "true":
+                raise ValueError("Non-loopback HTTP is disabled by default; use HTTPS")
+            LOG.warning("Unsafe HTTP LAN mode explicitly enabled; agent bearer tokens are unencrypted")
     disk = env.get("FLEETLUMA_DISK_PATH", os.path.abspath(os.sep))
     if not Path(disk).exists():
         raise ValueError("FLEETLUMA_DISK_PATH does not exist")
@@ -33,11 +38,21 @@ def load_config(env=None):
     return url, token, disk, interval
 
 
+class NoRedirect(request.HTTPRedirectHandler):
+    """Never forward an agent bearer token to an HTTP redirect destination."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
 def send_report(url, token, report, timeout=5):
     data = json.dumps(report).encode("utf-8")
     req = request.Request(url + "/api/v1/agent/reports", data=data, method="POST",
         headers={"Content-Type": "application/json", "Authorization": "Bearer " + token})
-    with request.urlopen(req, timeout=timeout) as response:
+    # urllib normally follows 30x redirects; that would expose bearer tokens
+    # to the destination host, including a different domain or HTTP scheme.
+    opener = request.build_opener(NoRedirect())
+    with opener.open(req, timeout=timeout) as response:
         if response.status != 202:
             raise RuntimeError("Coordinator rejected report: HTTP " + str(response.status))
         return json.load(response)
