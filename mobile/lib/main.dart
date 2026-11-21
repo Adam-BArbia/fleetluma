@@ -4,8 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'data/fleet_api.dart';
+import 'data/device_api.dart';
 import 'state/fleet_controller.dart';
 import 'ui/fleet_screen.dart';
+import 'ui/device_management_screen.dart';
 import 'ui/sign_in_screen.dart';
 import 'ui/sign_up_screen.dart';
 
@@ -14,6 +16,8 @@ const apiBaseUrl = String.fromEnvironment(
   defaultValue: 'http://10.0.2.2:8000',
 );
 const cloudMode = bool.fromEnvironment('FLEETLUMA_CLOUD_MODE');
+// Hidden until server migration + workspace-scoped API are actually deployed.
+const pairingUiEnabled = bool.fromEnvironment('FLEETLUMA_PAIRING_UI_ENABLED');
 // UI feature gate, NOT an authorization boundary. Set Supabase Auth policy separately.
 const registrationEnabled = bool.fromEnvironment('FLEETLUMA_ALLOW_SIGN_UP');
 const supabaseUrl = String.fromEnvironment('FLEETLUMA_SUPABASE_URL');
@@ -209,6 +213,16 @@ class _CloudAuthGateState extends State<_CloudAuthGate> {
           ),
           apiUrl: apiBaseUrl,
           onSignOut: () async => auth.signOut(),
+          onManageDevices: pairingUiEnabled ? () {
+            Navigator.of(context).push(MaterialPageRoute<void>(
+              builder: (_) => DeviceManagementScreen(
+                api: HttpFleetDeviceApi(
+                  baseUrl: apiBaseUrl,
+                  tokenProvider: () async => auth.currentSession?.accessToken,
+                ),
+              ),
+            ));
+          } : null,
         );
       },
     );
