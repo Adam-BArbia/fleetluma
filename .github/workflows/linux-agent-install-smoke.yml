@@ -36,7 +36,7 @@ jobs:
           test "$(stat -c %G /var/lib/fleetluma)" = fleetluma
           test ! -e /var/lib/fleetluma/private/identity.bin
           echo "Linux installed, private state owned by service UID, no device secret."
-      - name: Confirm local control fails safely without running systemd
+      - name: Verify local control works with systemd or fails safely without it
         run: |
           set +e
           sudo /usr/bin/fleetluma-control status >/tmp/fleetluma-control-out.txt 2>/tmp/fleetluma-control-err.txt
@@ -45,9 +45,19 @@ jobs:
           echo "Local helper exit code: $result"
           cat /tmp/fleetluma-control-out.txt
           cat /tmp/fleetluma-control-err.txt
-          test "$result" -eq 2
-          test ! -s /tmp/fleetluma-control-out.txt
-          grep -F "FleetLuma local control is unavailable" /tmp/fleetluma-control-err.txt
+          if [ "$result" -eq 0 ]; then
+            grep -F "No paired device." /tmp/fleetluma-control-out.txt
+            sudo systemctl is-active --quiet fleetluma-agent.service
+            test "$(sudo stat -c %a /run/fleetluma/control.sock)" = 600
+            echo "Real Linux systemd service and protected local IPC are running."
+          elif [ "$result" -eq 2 ]; then
+            test ! -s /tmp/fleetluma-control-out.txt
+            grep -F "FleetLuma local control is unavailable" /tmp/fleetluma-control-err.txt
+            echo "Headless Linux runner correctly has no running systemd socket."
+          else
+            echo "Unexpected local control return value" >&2
+            exit 1
+          fi
       - name: Purge and verify credential and service file removal
         run: |
           sudo dpkg --purge fleetluma-agent
