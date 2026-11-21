@@ -1,6 +1,7 @@
 """FL-37 supervisor starts from durable identity and locks revoked token."""
 import threading
 import unittest
+from unittest.mock import patch
 from uuid import uuid4
 
 from fleetluma_agent.secure_state import AgentIdentity, CredentialMissing
@@ -41,7 +42,8 @@ class InstantEvent:
 class SupervisorTests(unittest.TestCase):
     def test_known_installation_paths(self):
         self.assertTrue(str(default_identity_path("linux")).startswith("/var/lib/fleetluma/"))
-        self.assertIn("FleetLuma", str(default_identity_path("win32")) if False else "FleetLuma")
+        with patch.dict("os.environ", {"PROGRAMDATA": "C:/ProgramData"}):
+            self.assertIn("FleetLuma", str(default_identity_path("win32")))
         with self.assertRaises(RuntimeError):
             default_identity_path("darwin")
 
