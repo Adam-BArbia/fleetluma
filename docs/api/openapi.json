@@ -3,16 +3,16 @@
   "info": {
     "title": "FleetLuma API",
     "version": "0.1.0",
-    "description": "FleetLuma v0.1.0 target cloud contract. The pairing/device-management operations are DESIGN ONLY until runtime implementation and tests are merged. Existing cloud monitoring routes are live and require approved Supabase JWTs; agent reports use separate per-host credentials."
+    "description": "FleetLuma v0.1.0 target cloud contract. The pairing/device-management operations are DESIGN ONLY until runtime implementation and tests are merged. Existing cloud monitoring routes are live and require approved Supabase JWTs; agent reports use separate per-host credentials. For multi-workspace listing, workspace_id query is mandatory in the target contract; today's deployed API is not yet compatible."
   },
   "servers": [
     {
-      "url": "https://fleetluma-api.vercel.app",
-      "description": "Planned stable cloud API domain; configure before release (not proof of an active hostname)"
+      "url": "https://fleetluma-6n0ogdlgr-fleet-luma.vercel.app",
+      "description": "Existing verified cloud API preview; not a stable production domain; new pairing endpoints are not deployed"
     },
     {
       "url": "http://127.0.0.1:8000",
-      "description": "Local development only; never use over untrusted LAN"
+      "description": "Local development, loopback only"
     }
   ],
   "tags": [
@@ -152,7 +152,19 @@
             "OperatorJwt": []
           }
         ],
-        "description": " In cloud mode an approved operator JWT and workspace-scoped authorization are required. Design target; existing runtime currently enforces global approved-operator allowlist."
+        "description": " In cloud mode an approved operator JWT and workspace-scoped authorization are required. Design target; existing runtime currently enforces global approved-operator allowlist.",
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "query",
+            "required": true,
+            "description": "Approved workspace to scope the fleet listing (v0.1 target, not supported by current runtime).",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
       }
     },
     "/api/v1/hosts/{id}": {
@@ -422,6 +434,18 @@
         "security": [
           {
             "OperatorJwt": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "query",
+            "required": true,
+            "description": "Approved workspace scoping (v0.1 target).",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
           }
         ]
       }
@@ -1256,6 +1280,52 @@
           }
         ]
       }
+    },
+    "/api/v1/operator/workspaces": {
+      "get": {
+        "tags": [
+          "Device management"
+        ],
+        "summary": "List workspaces visible to the authenticated operator (design only)",
+        "description": "Verified operator JWT; each result includes the server-authorized membership role. No global workspace enumeration.",
+        "security": [
+          {
+            "OperatorJwt": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized workspaces",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkspaceList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1521,7 +1591,9 @@
           "os",
           "status",
           "last_seen_at",
-          "latest_metrics"
+          "latest_metrics",
+          "workspace_id",
+          "lifecycle"
         ]
       },
       "HostList": {
@@ -1886,7 +1958,7 @@
           },
           "user_code": {
             "type": "string",
-            "pattern": "^[A-Z2-9]{4}-[A-Z2-9]{4}$"
+            "pattern": "^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{4}-[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{4}$"
           },
           "verification_uri": {
             "type": "string",
@@ -1945,7 +2017,8 @@
         },
         "required": [
           "status"
-        ]
+        ],
+        "description": "Status pending has no host fields; paired includes both host_id and workspace_id. Pending status is HTTP 200 with no-store."
       },
       "PairingResolveRequest": {
         "type": "object",
@@ -1953,7 +2026,7 @@
         "properties": {
           "user_code": {
             "type": "string",
-            "pattern": "^[A-Z2-9]{4}-[A-Z2-9]{4}$"
+            "pattern": "^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{4}-[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{4}$"
           }
         },
         "required": [
@@ -1991,7 +2064,8 @@
               "type": "string",
               "minLength": 1,
               "maxLength": 40
-            }
+            },
+            "maxItems": 20
           },
           "expires_at": {
             "type": "string",
@@ -2190,6 +2264,47 @@
         "required": [
           "items",
           "has_more"
+        ]
+      },
+      "WorkspaceSummary": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "owner",
+              "admin",
+              "viewer"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "role"
+        ]
+      },
+      "WorkspaceList": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WorkspaceSummary"
+            }
+          }
+        },
+        "required": [
+          "items"
         ]
       }
     }
