@@ -278,11 +278,13 @@ class HostCard extends StatelessWidget {
       AgentStatus.connected => _mint,
       AgentStatus.pending => _subtle,
       AgentStatus.stale => _amber,
+      AgentStatus.revoked => Colors.redAccent,
     };
     final label = switch (host.status) {
       AgentStatus.connected => 'CONNECTED',
       AgentStatus.pending => 'PENDING',
       AgentStatus.stale => 'STALE',
+      AgentStatus.revoked => 'REVOKED',
     };
     final data = host.metrics;
 
@@ -352,7 +354,9 @@ class HostCard extends StatelessWidget {
             else ...[
               if (host.status != AgentStatus.connected) ...[
                 const Text(
-                  'LAST KNOWN READINGS · NOT LIVE',
+                  host.status == AgentStatus.revoked
+                      ? 'REVOKED · HISTORICAL READINGS'
+                      : 'LAST KNOWN READINGS · NOT LIVE',
                   style: TextStyle(
                     color: _amber,
                     fontWeight: FontWeight.w700,
