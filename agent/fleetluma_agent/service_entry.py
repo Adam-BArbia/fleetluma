@@ -74,6 +74,24 @@ def run_supervisor(store: ProtectedCredentialStore, *,
             stop_event.wait(poll_interval)
 
 
+def start_linux_control(store, stop_event, origin, runtime_dir=Path("/run/fleetluma")):
+    """Only started for Linux under the dedicated systemd service account."""
+    if not sys.platform.startswith("linux"):
+        raise RuntimeError("Linux control requires Linux")
+    from .pairing_client import PairingHttpClient
+    from .service_runtime import EnrollmentController
+    from .local_control import PrivateUnixControlServer, automatic_poller
+    client = PairingHttpClient(origin)  # must be trusted HTTPS
+    controller = EnrollmentController(store, client)
+    server = PrivateUnixControlServer(runtime_dir / "control.sock", controller)
+    serving = threading.Thread(target=server.serve_forever, daemon=True)
+    polling = threading.Thread(
+        target=automatic_poller, args=(controller, stop_event), daemon=True)
+    serving.start()
+    polling.start()
+    return server, serving, polling
+
+
 def main() -> None:
     logging.basicConfig(level=logging.INFO)
     stop_event = threading.Event()
@@ -86,7 +104,25 @@ def main() -> None:
         signal.signal(signal.SIGTERM, stop)
     store = ProtectedCredentialStore(default_identity_path())
     disk = Path("C:/") if sys.platform == "win32" else Path("/")
-    run_supervisor(store, disk_path=str(disk), stop_event=stop_event)
+    controls = None
+    # Installed Linux service: the remote origin is provisioned by the
+    # administrator-owned systemd configuration, never a user-provided token.
+    if sys.platform.startswith("linux"):
+        origin = os.environ.get("FLEETLUMA_COORDINATOR_URL", "")
+        if origin:
+            controls = start_linux_control(store, stop_event, origin)
+        else:
+            LOG.warning("Agent is idle; pairing disabled until HTTPS origin is installed")
+    try:
+        run_supervisor(store, disk_path=str(disk), stop_event=stop_event)
+    finally:
+        stop_event.set()
+        if controls is not None:
+            server, serving, polling = controls
+            server.shutdown()
+            server.server_close()
+            serving.join(timeout=5)
+            polling.join(timeout=5)
 
 
 if __name__ == "__main__":
