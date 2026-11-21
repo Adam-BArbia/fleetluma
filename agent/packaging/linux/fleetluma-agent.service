@@ -1,0 +1,36 @@
+[Unit]
+Description=FleetLuma CPU RAM and disk monitoring service
+Documentation=https://github.com/Adam-BArbia/fleetluma
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=fleetluma
+Group=fleetluma
+ExecStart=/usr/lib/fleetluma/fleetluma-agent
+Restart=on-failure
+RestartSec=10
+StateDirectory=fleetluma
+StateDirectoryMode=0700
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+CapabilityBoundingSet=
+AmbientCapabilities=
+ReadWritePaths=/var/lib/fleetluma
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=fleetluma-agent
+
+[Install]
+WantedBy=multi-user.target
