@@ -88,6 +88,18 @@ def test_pairing_approve_poll_ingest_revoke_and_reject_old_token(pairer):
     assert approval["status"] == "approved"
     # Repeated approval by the same actor is idempotent; no duplicate host.
     assert pairer.approve(reviewed["pairing_id"], operator_ws, OWNER) == approval
+    # Even an approved device must obey its 5-second polling interval.
+    with pytest.raises(PairingFailure) as too_fast:
+        pairer.poll(ticket["device_code"])
+    assert too_fast.value.status == 429
+    # Advance the durable next-poll timestamp in isolated CI without sleep.
+    with _connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+              UPDATE fleetluma.pairing_sessions
+              SET next_poll_at=now()-interval '1 second'
+              WHERE device_code_hash=%s
+            """, (hashlib.sha256(ticket["device_code"].encode()).hexdigest(),))
     polled = pairer.poll(ticket["device_code"])
     assert polled == {"status": "paired", "host_id": approval["host_id"],
                       "workspace_id": operator_ws}
