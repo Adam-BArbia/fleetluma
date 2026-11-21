@@ -1,30 +1,74 @@
 @startuml 19_class_api_contract
+title Cloud v0.1.0 API DTOs - planned extensions
 class AgentReportDTO {
- +timestamp: Instant
+ +sampled_at: Instant
  +metrics: SystemMetricsDTO
  +processes: ProcessDTO[0..10]?
 }
 class SystemMetricsDTO {
- +cpuPct: Float
- +ramUsedBytes: Long
- +ramTotalBytes: Long
- +diskPath: String
- +diskUsedBytes: Long
- +diskTotalBytes: Long
+ +cpu_pct: Float
+ +ram_used_bytes: Long
+ +ram_total_bytes: Long
+ +disk_path: String
+ +disk_used_bytes: Long
+ +disk_total_bytes: Long
 }
 class ProcessDTO {
  +pid: Int
  +name: String
- +cpuPct: Float
- +memoryBytes: Long
+ +cpu_pct: Float
+ +memory_bytes: Long
 }
 class AcceptedReportResponse {
-  +acceptedAt: Instant
+ +host_id: UUID
+ +received_at: Instant
+ +status: accepted
+}
+class PairingCreateRequest {
+ +hostname: String
+ +platform: windows|linux
+ +agent_version: String
+ +report_token_sha256: HexDigest
+}
+class PairingCreated {
+ +device_code: PrivateSecret
+ +user_code: ShortCode
+ +verification_uri: HTTPS_URL
+ +expires_in: 600
+ +interval: Int
+}
+class PairingTokenResult {
+ +status: pending|paired
+ +host_id: UUID?
+ +workspace_id: UUID?
+}
+class PairingApprovalRequest {
+ +workspace_id: UUID
+}
+class PairingApprovalResult {
+ +status: approved
+ +host_id: UUID
+ +workspace_id: UUID
+}
+class ManagedHost {
+ +id: UUID
+ +workspace_id: UUID
+ +lifecycle: ACTIVE|REVOKED
+ +status: PENDING|CONNECTED|STALE|REVOKED
+}
+class ApiError {
+ +error.code: String
+ +error.message: String
 }
 AgentReportDTO *-- SystemMetricsDTO
 AgentReportDTO *-- "0..10" ProcessDTO
-note right of AgentReportDTO
- Host identity must come from the agent token,
- not a client-provided host identifier.
+note right of PairingCreated
+ user_code is display-only and expires after 10m.
+ device_code private to agent polling.
+ No long-lived agent token in any response.
+end note
+note bottom of AgentReportDTO
+ Host identity is inferred solely from ACTIVE
+ report token hash, never report body.
 end note
 @enduml
