@@ -39,9 +39,11 @@ class _DeviceManagementScreenState extends State<DeviceManagementScreen> {
       await action();
     } catch (_) {
       // No raw HTTP response, JWT, device_code, or credential in UI messages.
-      if (mounted) setState(() {
-        _error = 'The action could not be completed. Check your access, code, or connection.';
-      });
+      if (mounted) {
+        setState(() {
+          _error = 'The action could not be completed. Check your access, code, or connection.';
+        });
+      }
     } finally {
       if (mounted) {
         setState(() => _busy = false);
@@ -58,20 +60,28 @@ class _DeviceManagementScreenState extends State<DeviceManagementScreen> {
     setState(() { _workspaces = workspaces; _workspaceId = selected; });
     if (selected != null) {
       final devices = await widget.api.hosts(selected);
-      if (mounted) setState(() => _devices = devices);
+      if (mounted) {
+        setState(() => _devices = devices);
+      }
     } else {
-      if (mounted) setState(() => _devices = const []);
+      if (mounted) {
+        setState(() => _devices = const []);
+      }
     }
   });
 
   Future<void> _resolve() => _perform(() async {
     final code = _code.text.trim().toUpperCase();
     if (!RegExp(r'^[A-HJ-NP-Z2-9]{4}-?[A-HJ-NP-Z2-9]{4}$').hasMatch(code)) {
-      if (mounted) setState(() => _error = 'Enter the eight-character code shown on the agent.');
+      if (mounted) {
+        setState(() => _error = 'Enter the eight-character code shown on the agent.');
+      }
       return;
     }
     final result = await widget.api.resolveCode(code);
-    if (mounted) setState(() => _preview = result);
+    if (mounted) {
+      setState(() => _preview = result);
+    }
   });
 
   Future<void> _approve() => _perform(() async {
@@ -123,7 +133,9 @@ class _DeviceManagementScreenState extends State<DeviceManagementScreen> {
       final selected = _workspaceId;
       if (selected == null) return;
       final devices = await widget.api.hosts(selected);
-      if (mounted) setState(() => _devices = devices);
+      if (mounted) {
+        setState(() => _devices = devices);
+      }
     });
   }
 
