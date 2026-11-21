@@ -1,35 +1,72 @@
 @startuml 04_class_backend
+title FastAPI cloud domain services - target
 interface HostRepository {
- +findById(id): Host?
+ +findWorkspaceHost(id, workspaceId): Host?
+ +lookupActiveByTokenHash(digest): Host?
+ +revoke(id, workspaceId)
  +updateHeartbeat(id, time)
 }
 interface MetricsRepository {
-  +save(sample)
-  +history(hostId, window)
+ +saveAtomic(report, hostId)
+ +history(hostId, workspaceId, window)
 }
-interface ServiceRepository {
-  +listEnabled()
-  +saveCheck(check)
+interface PairingRepository {
+ +createPending(request): PairingSession
+ +resolveCodeHash(codeHash): PairingSession?
+ +approveAtomic(sessionId, workspaceId, actorId): Host
+ +pollByPrivateSecretHash(hash): PairingState
+ +deny(sessionId)
+}
+interface MembershipRepository {
+ +requireRole(actorId, workspaceId, roles)
+}
+interface AuditRepository {
+ +recordRedacted(event)
+}
+class SupabaseJwtVerifier {
+ +verifyIssuerAudienceExpiry(token): OperatorId
+}
+class OperatorAuthorization {
+ +requireWorkspaceRole(jwt, workspaceId, allowedRoles)
+}
+class PairingService {
+ +requestPairing(deviceInfo, tokenHash)
+ +poll(privateCode)
+ +approve(userCode, workspaceId, operator)
+ +deny(pairingId, operator)
 }
 class AgentIngestionService {
-  +accept(report, token): Result
+ +accept(report, agentToken): AcceptedReport
 }
-class Authenticator {
-  +resolveHost(token): Host?
+class DeviceManagementService {
+ +list(actor, workspaceId)
+ +rename(actor, hostId, name)
+ +revoke(actor, hostId)
 }
 class HostStatusPolicy {
-  +state(lastSeenAt, now): HostState
-}
-class HttpCheckWorker {
-  +checkEnabledServices()
+ +state(lastSeenAt, lifecycle, now): HostState
 }
 class HistoryQueryService {
-  +metrics(hostId, window)
+ +metrics(operator, hostId, window)
 }
-AgentIngestionService --> Authenticator
+class ExternalHttpCheckWorker {
+ +checkAllowlistedServices()
+}
+PairingService --> PairingRepository
+PairingService --> OperatorAuthorization
+PairingService --> AuditRepository
+OperatorAuthorization --> SupabaseJwtVerifier
+OperatorAuthorization --> MembershipRepository
 AgentIngestionService --> HostRepository
 AgentIngestionService --> MetricsRepository
-HttpCheckWorker --> ServiceRepository
+DeviceManagementService --> HostRepository
+DeviceManagementService --> OperatorAuthorization
+DeviceManagementService --> AuditRepository
 HistoryQueryService --> MetricsRepository
-HostStatusPolicy --> HostRepository
+HistoryQueryService --> OperatorAuthorization
+HistoryQueryService --> HostStatusPolicy
+note right of ExternalHttpCheckWorker
+ Separate Supabase scheduled function (FL-19).
+ Never run as FastAPI background thread.
+end note
 @enduml
