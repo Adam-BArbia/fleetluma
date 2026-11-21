@@ -1,13 +1,24 @@
 @startuml 17_state_agent
-[*] --> STARTING
-STARTING --> COLLECTING : configuration loaded
-STARTING --> CONFIG_ERROR : invalid config
+title Agent background-service lifecycle and pairing
+[*] --> NOT_PAIRED : first installation
+NOT_PAIRED --> PAIRING : user initiates
+PAIRING --> PAIRED : authorized approval + private poll
+PAIRING --> NOT_PAIRED : denied / expiry / cancelled
+PAIRED --> STARTING : credential loaded from protected store
+STARTING --> COLLECTING : HTTPS API ready
+STARTING --> OFFLINE_BACKOFF : network failure
 COLLECTING --> REPORTING : sample ready
-REPORTING --> COLLECTING : 2xx accepted
-REPORTING --> RETRY_WAIT : transport/server failure
-RETRY_WAIT --> REPORTING : retry permitted
-COLLECTING --> STOPPED : shutdown
-RETRY_WAIT --> STOPPED : shutdown
-CONFIG_ERROR --> STOPPED : stop
-STOPPED --> [*]
+REPORTING --> COLLECTING : 202 accepted
+REPORTING --> OFFLINE_BACKOFF : network/server failure
+OFFLINE_BACKOFF --> REPORTING : retry allowed
+OFFLINE_BACKOFF --> STARTING : restart
+REPORTING --> NEEDS_REPAIR : 401 revoked/invalid
+STARTING --> NEEDS_REPAIR : credential lost
+NEEDS_REPAIR --> PAIRING : explicit physical re-pair
+COLLECTING --> STOPPED : service stop
+REPORTING --> STOPPED : service stop
+OFFLINE_BACKOFF --> STOPPED : service stop
+NEEDS_REPAIR --> STOPPED : service stop
+STOPPED --> STARTING : OS reboot, credential retained
+note right of PAIRED : Setup window may close; service continues.
 @enduml
