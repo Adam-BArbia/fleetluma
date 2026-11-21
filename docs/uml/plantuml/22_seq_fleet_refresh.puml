@@ -17,7 +17,7 @@ loop Every 5 seconds while app active
  API --> UI : Authorized host list / 401 / 403
  UI -> UI : Render latest vs stale honestly
 end
-note bottom
+note over API,DB
  Current runtime uses global approved-operator allowlist;
  workspace filtering is v0.1.0 target not yet deployed.
 end note
