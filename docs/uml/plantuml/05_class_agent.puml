@@ -1,34 +1,68 @@
 @startuml 05_class_agent
+title Agent service and setup companion - Windows / Linux
 class AgentConfig {
-  +hostId: UUID
-  +token: Secret
-  +coordinatorUrl: URL
+ +coordinatorUrl: HTTPS_URL
+ +hostId: UUID?
+ +platform: String
+ +intervalSeconds: Int
+}
+class ProtectedCredentialStore {
+ +createRandomReportingCredential()
+ +loadOrFail(): Secret
+ +storeOwnedSecret(secret)
+ +deleteOnExplicitReset()
+}
+class LocalIpcServer {
+ +listenOnlyToAuthorizedLocalCaller()
+ +beginPairing()
+ +status(): AgentStatus
+}
+class SetupUi {
+ +showPairingCode()
+ +showConnectionState()
+ +showDataCollectionConsent()
+ +requestRepair()
+}
+class PairingClient {
+ +createSession(reportTokenHash, metadata)
+ +pollWithPrivateDeviceCode()
+ +cancel()
+}
+class ServiceLifecycle {
+ +startAtBoot()
+ +restartWithBackoff()
+ +stop()
 }
 class MetricsCollector {
-  +collectCpu(): Float
-  +collectRam(): Memory
-  +collectDisk(): Disk
+ +collectCpu(): Float
+ +collectRam(): Memory
+ +collectDisk(): Disk
 }
 class ProcessCollector {
-  +topProcesses(limit): ProcessEntry[*]
+ +topProcesses(limit): ProcessEntry[*]
 }
 class ReportComposer {
-  +assemble(metrics, processes): AgentReport
+ +assemble(metrics, processes): AgentReport
 }
 class HttpReporter {
-  +send(report, token): Response
+ +sendHttps(report, reportingCredential): AcceptedReport
 }
 class RetryPolicy {
-  +backoff(attempt): Duration
+ +backoff(attempt): Duration
 }
-class AgentLoop {
-  +run()
-  +stop()
-}
-AgentLoop --> MetricsCollector
-AgentLoop --> ProcessCollector
-AgentLoop --> ReportComposer
-AgentLoop --> HttpReporter
+SetupUi --> LocalIpcServer : protected pipe / UNIX socket
+LocalIpcServer --> PairingClient
+PairingClient --> ProtectedCredentialStore
+ServiceLifecycle --> LocalIpcServer
+ServiceLifecycle --> MetricsCollector
+ServiceLifecycle --> ProcessCollector
+ServiceLifecycle --> ReportComposer
+ServiceLifecycle --> HttpReporter
+HttpReporter --> ProtectedCredentialStore
 HttpReporter --> RetryPolicy
 HttpReporter --> AgentConfig
+note right of SetupUi
+ UI may close while service continues reporting.
+ No Python/WSL/DB string exposed to end user.
+end note
 @enduml
