@@ -85,7 +85,15 @@ class PostgresStore:
         with self._connect() as conn:
             with conn.cursor() as cur:
                 # Exact hashed match; token hashes never leave the DB/API.
-                cur.execute("SELECT id FROM fleetluma.hosts WHERE token_hash=%s", (token_hash,))
+                if os.environ.get("FLEETLUMA_PAIRING_ENABLED") == "true":
+                    # Serialize against revoke(); rejected reports never mutate
+                    # samples or heartbeat even under concurrent requests.
+                    cur.execute("""
+                        SELECT id FROM fleetluma.hosts
+                        WHERE token_hash=%s AND lifecycle='ACTIVE' FOR UPDATE
+                    """, (token_hash,))
+                else:
+                    cur.execute("SELECT id FROM fleetluma.hosts WHERE token_hash=%s", (token_hash,))
                 row = cur.fetchone()
                 if row is None:
                     return None
@@ -219,3 +227,129 @@ class PostgresStore:
                 cur.execute("DELETE FROM fleetluma.service_checks WHERE checked_at < %s", (cutoff,))
                 checks_deleted = cur.rowcount
         return {"samples": metrics_deleted, "checks": checks_deleted}
+
+    # FL-32 target: workspace-filtered monitor query methods. None of these
+    # rely on user-controlled JWT metadata; 'actor' is the verified sub claim.
+    # These are invoked only when FLEETLUMA_PAIRING_ENABLED=true after migration.
+
+    @staticmethod
+    def _uuid(value):
+        return str(UUID(str(value)))
+
+    @staticmethod
+    def _membership(cur, actor, workspace_id):
+        cur.execute("""
+          SELECT 1 FROM fleetluma.workspace_memberships
+          WHERE user_id=%s AND workspace_id=%s
+        """, (actor, workspace_id))
+        if cur.fetchone() is None:
+            raise PermissionError("Workspace access denied")
+
+    def hosts_scoped(self, actor, workspace_id):
+        workspace_id, actor = self._uuid(workspace_id), self._uuid(actor)
+        with self._connect() as conn:
+            with conn.cursor() as cur:
+                self._membership(cur, actor, workspace_id)
+                cur.execute("""
+                  SELECT * FROM fleetluma.hosts
+                  WHERE workspace_id=%s ORDER BY name
+                """, (workspace_id,))
+                rows=cur.fetchall()
+            return [self._serialize_host_scoped(conn, row) for row in rows]
+
+    def _serialize_host_scoped(self, conn, row):
+        record=self._serialize_host(conn, row)
+        record["workspace_id"]=str(row["workspace_id"])
+        record["lifecycle"]=row["lifecycle"]
+        if row["lifecycle"] == "REVOKED":
+            record["status"]="REVOKED"
+        return record
+
+    def host_scoped(self, host_id, actor):
+        host_id, actor = self._uuid(host_id), self._uuid(actor)
+        with self._connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                  SELECT h.* FROM fleetluma.hosts h
+                  JOIN fleetluma.workspace_memberships m
+                    ON m.workspace_id=h.workspace_id
+                  WHERE h.id=%s AND m.user_id=%s
+                """, (host_id, actor))
+                row=cur.fetchone()
+            return self._serialize_host_scoped(conn, row) if row else None
+
+    def history_scoped(self, host_id, window, actor):
+        host_id, actor = self._uuid(host_id), self._uuid(actor)
+        cutoff=datetime.now(timezone.utc)-WINDOWS[window]
+        with self._connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                  SELECT s.sampled_at,s.received_at,s.metrics
+                  FROM fleetluma.samples s
+                  JOIN fleetluma.hosts h ON h.id=s.host_id
+                  JOIN fleetluma.workspace_memberships m ON m.workspace_id=h.workspace_id
+                  WHERE s.host_id=%s AND m.user_id=%s AND s.received_at >= %s
+                  ORDER BY s.received_at ASC LIMIT 10000
+                """, (host_id, actor, cutoff))
+                rows=cur.fetchall()
+        return {"host_id":host_id,"window":window,"items":[{
+            "sampled_at": iso(r["sampled_at"]),
+            "received_at": iso(r["received_at"]),
+            "cpu_pct": r["metrics"]["cpu_pct"],
+            "ram_pct": round(100*r["metrics"]["ram_used_bytes"]/r["metrics"]["ram_total_bytes"],2),
+            "disk_pct": round(100*r["metrics"]["disk_used_bytes"]/r["metrics"]["disk_total_bytes"],2),
+        } for r in rows]}
+
+    def processes_scoped(self, host_id, actor):
+        host_id, actor = self._uuid(host_id), self._uuid(actor)
+        with self._connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                  SELECT p.captured_at,p.processes FROM fleetluma.process_snapshots p
+                  JOIN fleetluma.hosts h ON h.id=p.host_id
+                  JOIN fleetluma.workspace_memberships m ON m.workspace_id=h.workspace_id
+                  WHERE p.host_id=%s AND m.user_id=%s
+                """, (host_id, actor))
+                row=cur.fetchone()
+        return {"host_id":host_id,
+                "captured_at":iso(row["captured_at"]) if row else None,
+                "processes":row["processes"] if row else []}
+
+    def services_scoped(self, actor, workspace_id):
+        workspace_id, actor = self._uuid(workspace_id), self._uuid(actor)
+        with self._connect() as conn:
+            with conn.cursor() as cur:
+                self._membership(cur,actor,workspace_id)
+                cur.execute("""
+                  SELECT s.*,c.checked_at,c.status,c.latency_ms
+                  FROM fleetluma.services s
+                  LEFT JOIN LATERAL (
+                    SELECT checked_at,status,latency_ms
+                    FROM fleetluma.service_checks
+                    WHERE service_id=s.id ORDER BY id DESC LIMIT 1
+                  ) c ON TRUE
+                  WHERE s.workspace_id=%s ORDER BY s.name
+                """, (workspace_id,))
+                rows=cur.fetchall()
+        return [{ "id":str(r["id"]),
+                  "host_id":str(r["host_id"]) if r["host_id"] else None,
+                  "name":r["name"],"url":r["url"],"enabled":r["enabled"],
+                  "status":r["status"] or "UNKNOWN",
+                  "checked_at":iso(r["checked_at"]) if r["checked_at"] else None,
+                  "latency_ms":r["latency_ms"]} for r in rows]
+
+    def service_checks_scoped(self, service_id, window, actor):
+        service_id,actor=self._uuid(service_id),self._uuid(actor)
+        with self._connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                  SELECT c.checked_at,c.status,c.http_code,c.latency_ms,c.failure_kind
+                  FROM fleetluma.service_checks c
+                  JOIN fleetluma.services s ON s.id=c.service_id
+                  JOIN fleetluma.workspace_memberships m ON m.workspace_id=s.workspace_id
+                  WHERE c.service_id=%s AND m.user_id=%s AND
+                    c.checked_at >= %s ORDER BY c.checked_at ASC LIMIT 10000
+                """, (service_id, actor, datetime.now(timezone.utc)-WINDOWS[window]))
+                rows=cur.fetchall()
+        return {"service_id":service_id,"window":window,
+                "items":[dict(r,checked_at=iso(r["checked_at"])) for r in rows]}
