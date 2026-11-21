@@ -1,0 +1,55 @@
+name: Linux Debian package isolated acceptance
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'agent/**'
+      - '.github/workflows/linux-agent-install-smoke.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  isolated-ubuntu-package-acceptance:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Prepare Linux agent and package build
+        run: |
+          python -m pip install -r agent/requirements.txt
+          python -m pip install "pyinstaller==6.16.0"
+          python -m unittest discover -s agent/tests -v
+          sh agent/packaging/linux/build_deb.sh
+      - name: Install on disposable Ubuntu runner
+        run: |
+          sudo dpkg -i FleetLuma-Linux-UNSIGNED-CANDIDATE.deb
+          dpkg-query --show fleetluma-agent
+          test -x /usr/lib/fleetluma/fleetluma-agent
+          test -x /usr/bin/fleetluma-control
+          test -f /lib/systemd/system/fleetluma-agent.service
+          test -f /etc/fleetluma/agent.conf
+          test "$(stat -c %a /var/lib/fleetluma)" = 700
+          test "$(stat -c %U /var/lib/fleetluma)" = fleetluma
+          test "$(stat -c %G /var/lib/fleetluma)" = fleetluma
+          test ! -e /var/lib/fleetluma/private/identity.bin
+          echo "Linux installed, private state owned by service UID, no device secret."
+      - name: Confirm local control fails safely without running systemd
+        run: |
+          set +e
+          sudo /usr/bin/fleetluma-control status >/tmp/fleetluma-control-out.txt 2>/tmp/fleetluma-control-err.txt
+          result=$?
+          set -e
+          test "$result" -eq 2
+          test ! -s /tmp/fleetluma-control-out.txt
+          grep -F "FleetLuma local control is unavailable" /tmp/fleetluma-control-err.txt
+      - name: Purge and verify credential and service file removal
+        run: |
+          sudo dpkg --purge fleetluma-agent
+          test ! -e /usr/bin/fleetluma-control
+          test ! -e /lib/systemd/system/fleetluma-agent.service
+          test ! -e /etc/fleetluma/agent.conf
+          test ! -e /var/lib/fleetluma/private/identity.bin
+          echo "Linux package purge and state cleanup passed."
