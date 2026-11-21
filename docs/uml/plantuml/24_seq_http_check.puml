@@ -1,18 +1,24 @@
 @startuml 24_seq_http_check
-participant Scheduler
-participant "Health worker" as Worker
-participant "Approved endpoint" as Endpoint
-database SQLite as DB
-Scheduler -> Worker : run scheduled check
-Worker -> Worker : validate preapproved target
-Worker -> Endpoint : HTTP GET (bounded timeout)
-alt successful 2xx/3xx
- Endpoint --> Worker : code and latency
- Worker -> DB : persist HEALTHY + latency
-else HTTP failure
- Endpoint --> Worker : 4xx/5xx
- Worker -> DB : persist UNHEALTHY + code
-else timeout/network error
- Worker -> DB : persist UNHEALTHY + error kind
+title External checker and private workspace service status (FL-19)
+participant "Supabase cron" as Scheduler
+participant "Supabase Edge Function" as Worker
+participant "Approved public service" as Endpoint
+database "Private PostgreSQL" as DB
+Scheduler -> Worker : Scheduled invocation
+Worker -> DB : Load enabled workspace services
+DB --> Worker : Approved targets
+Worker -> Worker : Validate DNS, IP and redirect policy
+alt safe public destination
+ Worker -> Endpoint : Bounded HTTP GET
+ alt allowed success response
+  Endpoint --> Worker : 2xx/3xx and latency
+  Worker -> DB : Commit HEALTHY + latency
+ else HTTP/network failure
+  Endpoint --> Worker : failure/timeout
+  Worker -> DB : Commit UNHEALTHY + reason
+ end
+else unsafe destination
+ Worker -> Worker : Reject before any outbound request
 end
+note right of Worker : Not a FastAPI in-process timer.
 @enduml
