@@ -50,7 +50,9 @@ class PairingStore(PostgresStore):
         # consumed attempt. Persist limit in a separate committed transaction.
         with self._connect() as conn:
             with conn.cursor() as cur:
-                self._limit(cur, scope, digest, maximum)
+                allowed = self._limit(cur, scope, digest, maximum)
+        if not allowed:
+            raise PairingFailure(429, "Too many requests; try again later")
 
     @staticmethod
     def _limit(cur, scope: str, digest: str, maximum: int,
@@ -73,8 +75,7 @@ class PairingStore(PostgresStore):
             END
           RETURNING attempts
         """, (scope, digest, window, window))
-        if cur.fetchone()["attempts"] > maximum:
-            raise PairingFailure(429, "Too many requests; try again later")
+        return cur.fetchone()["attempts"] <= maximum
 
     def _admin(self, cur, actor: str, workspace: str | None = None):
         """Return one authorized workspace or fail closed."""
