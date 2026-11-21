@@ -41,7 +41,7 @@ class InstantEvent:
 
 class SupervisorTests(unittest.TestCase):
     def test_known_installation_paths(self):
-        self.assertTrue(str(default_identity_path("linux")).startswith("/var/lib/fleetluma/"))
+        self.assertTrue(default_identity_path("linux").as_posix().endswith("var/lib/fleetluma/private/identity.bin"))
         with patch.dict("os.environ", {"PROGRAMDATA": "C:/ProgramData"}):
             self.assertIn("FleetLuma", str(default_identity_path("win32")))
         with self.assertRaises(RuntimeError):
