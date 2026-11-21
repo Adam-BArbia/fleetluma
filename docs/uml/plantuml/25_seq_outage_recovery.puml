@@ -1,18 +1,24 @@
 @startuml 25_seq_outage_recovery
-participant "Demo service" as S
-participant "HTTP checker" as C
-database SQLite as DB
-participant "Flutter client" as UI
-S -> S : Stop service
-C -> S : Periodic GET
-S --> C : connection failure
-C -> DB : store UNHEALTHY
-UI -> DB : via monitoring API
-DB --> UI : UNHEALTHY
-S -> S : Restart service
-C -> S : Periodic GET
+title Independently scheduled service outage recovery (FL-19)
+participant "Approved external service" as S
+participant "Supabase Edge checker" as C
+database "Private PostgreSQL" as DB
+participant "FastAPI scoped services API" as API
+participant "Flutter operator" as UI
+S -> S : Stops serving
+C -> S : Public-only bounded probe
+S --> C : Network failure
+C -> DB : Store UNHEALTHY in workspace
+UI -> API : GET authorized service checks with JWT
+API -> DB : Enforce workspace membership
+DB --> API : UNHEALTHY
+API --> UI : Service error
+S -> S : Service restored
+C -> S : Next approved public probe
 S --> C : 200 OK
-C -> DB : store HEALTHY
-UI -> DB : via monitoring API
-DB --> UI : HEALTHY
+C -> DB : Store HEALTHY in workspace
+UI -> API : Authorized refresh
+API -> DB : Enforce membership, fetch latest
+DB --> API : HEALTHY
+API --> UI : Service recovered
 @enduml
