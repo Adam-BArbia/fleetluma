@@ -38,6 +38,7 @@ jobs:
       - name: Install test dependencies and psql client
         run: |
           python -m pip install -r backend/requirements-dev.txt
+          python -m pip install -r agent/requirements.txt
           sudo apt-get update
           sudo apt-get install -y postgresql-client
       - name: Prepare Supabase role equivalents for isolated CI
@@ -69,3 +70,10 @@ jobs:
         env:
           FLEETLUMA_PAIRING_ENABLED: 'true'
         run: python -m pytest -q tests/test_pairing_postgres_integration.py
+
+      - name: End-to-end device HTTP pairing and revocation with real agent
+        working-directory: backend
+        env:
+          FLEETLUMA_PAIRING_ENABLED: 'true'
+          FLEETLUMA_WORKSPACE_ENFORCEMENT_ENABLED: 'true'
+        run: python -m pytest -q tests/test_full_stack_agent_pairing.py
