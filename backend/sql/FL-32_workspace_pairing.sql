@@ -103,6 +103,15 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_fl_pairing_host_consumed
  ON fleetluma.pairing_sessions(host_id) WHERE status IN('APPROVED','CONSUMED');
 
 -- Durable per-identity throttling across stateless Vercel requests.
+-- Prove a particular operator actually entered the visible code; possession
+-- of a guessed pairing UUID is never enough to approve or deny.
+CREATE TABLE IF NOT EXISTS fleetluma.pairing_reviews (
+  pairing_id uuid NOT NULL REFERENCES fleetluma.pairing_sessions(id) ON DELETE CASCADE,
+  operator_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  reviewed_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY(pairing_id,operator_id)
+);
+
 CREATE TABLE IF NOT EXISTS fleetluma.pairing_rate_limits (
   scope text NOT NULL CHECK (scope IN ('create','resolve')),
   subject_digest text NOT NULL CHECK (subject_digest ~ '^[a-f0-9]{64}
@@ -124,6 +133,7 @@ ALTER TABLE fleetluma.workspace_memberships ENABLE ROW LEVEL SECURITY;
 ALTER TABLE fleetluma.pairing_sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE fleetluma.device_audit_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE fleetluma.pairing_rate_limits ENABLE ROW LEVEL SECURITY;
+ALTER TABLE fleetluma.pairing_reviews ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON ALL TABLES IN SCHEMA fleetluma FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON ALL SEQUENCES IN SCHEMA fleetluma FROM PUBLIC, anon, authenticated;
 
