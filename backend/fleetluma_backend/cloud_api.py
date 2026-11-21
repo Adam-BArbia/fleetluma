@@ -132,9 +132,11 @@ def create_cloud_app(store_factory=PostgresStore, pairing_store_factory=None):
         except ValueError:
             raise HTTPException(404, "Unknown service")
         if pairing_enabled:
-            # Verify authorization via a workspace-scoped query; never expose
-            # the existence of a service owned by another workspace.
-            return store_factory().service_checks_scoped(identifier, window, operator)
+            # Unknown and other-workspace IDs are equally invisible.
+            scoped = store_factory()
+            if not scoped.service_visible_to(identifier, operator):
+                raise HTTPException(404, "Unknown service")
+            return scoped.service_checks_scoped(identifier, window, operator)
         if not any(x["id"] == identifier for x in store_factory().services()):
             raise HTTPException(404, "Unknown service")
         return store_factory().service_checks(identifier, window)
