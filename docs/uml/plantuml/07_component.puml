@@ -1,16 +1,28 @@
 @startuml 07_component
-component "Agent A\nPython / psutil" as AgentA
-component "Agent B\nPython / psutil" as AgentB
-component "FleetLuma Coordinator\nFastAPI" as Backend
-component "HTTP Check Worker" as Worker
-database "SQLite" as DB
-component "Flutter mobile" as Mobile
-cloud "Approved HTTP endpoints" as Endpoint
-AgentA --> Backend : authenticated report POST
-AgentB --> Backend : authenticated report POST
-Mobile --> Backend : GET monitoring REST API
-Backend --> DB : persist/query
-Worker --> DB : check records
-Backend -- Worker : internal scheduler
-Worker --> Endpoint : HTTP probe
+title FleetLuma cloud components (v0.1.0 design)
+component "Windows/Linux setup UI" as Setup
+component "Windows/Linux agent service" as Agent
+component "Flutter Web / Android" as Client
+component "FastAPI pairing + device management" as Pair
+component "FastAPI monitoring API" as Monitor
+component "Supabase Auth" as Auth
+database "Supabase private PostgreSQL" as DB
+component "External scheduled checker\nSupabase Edge Function (FL-19)" as Worker
+cloud "Allowlisted public HTTP endpoints" as Endpoints
+Setup --> Agent : ACL protected local IPC
+Agent --> Pair : request + poll pairing over HTTPS
+Agent --> Monitor : authenticated report HTTPS
+Client --> Pair : approved JWT + code / device actions
+Client --> Monitor : approved JWT + workspace reads
+Client --> Auth : operator sign in
+Pair --> Auth : JWKS issuer validation
+Monitor --> Auth : JWKS issuer validation
+Pair --> DB : transactional enrollment
+Monitor --> DB : private pooled SQL
+Worker --> DB : checks / retention
+Worker --> Endpoints : bounded probe
+note bottom
+ Cloud final design only; original local SQLite demo is 09_deployment.
+ No in-process scheduled checker in Vercel.
+end note
 @enduml
