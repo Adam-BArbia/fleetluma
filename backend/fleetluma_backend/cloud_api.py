@@ -22,13 +22,24 @@ def create_cloud_app(store_factory=PostgresStore):
     if not os.environ.get("FLEETLUMA_DATABASE_URL"):
         raise RuntimeError("Cloud API requires FLEETLUMA_DATABASE_URL")
 
+    # Do not expose enrollment until database migration and workspace scoping land.
+    pairing_enabled = os.environ.get("FLEETLUMA_PAIRING_ENABLED") == "true"
+    if pairing_enabled and os.environ.get("FLEETLUMA_WORKSPACE_ENFORCEMENT_ENABLED") != "true":
+        raise RuntimeError("Pairing requires fully enforced workspace-scoped API")
+    if pairing_enabled and len(os.environ.get("FLEETLUMA_PAIRING_PEPPER", "")) < 32:
+        raise RuntimeError("Pairing requires private secure HMAC secret")
+
     app = FastAPI(title="FleetLuma Cloud API", version="0.1.0")
     configure_cors(app)
+    if pairing_enabled:
+        from .pairing_routes import make_pairing_router
+        app.include_router(make_pairing_router())
 
     @app.exception_handler(HTTPException)
     async def http_error(request, exc):
         code = {401: "UNAUTHORIZED", 403: "FORBIDDEN", 404: "NOT_FOUND",
-                422: "INVALID_REQUEST"}.get(exc.status_code, "HTTP_ERROR")
+                409: "CONFLICT", 410: "EXPIRED", 429: "RATE_LIMITED",
+                503: "UNAVAILABLE", 422: "INVALID_REQUEST"}.get(exc.status_code, "HTTP_ERROR")
         return JSONResponse(status_code=exc.status_code,
                             content={"error": {"code": code, "message": str(exc.detail)}})
 
