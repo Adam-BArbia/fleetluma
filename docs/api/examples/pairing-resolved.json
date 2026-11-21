@@ -1,0 +1,13 @@
+{
+  "pairing_id": "22fa522e-14bb-4a80-b0f2-15b5a13a97cd",
+  "hostname": "workstation-02",
+  "platform": "windows",
+  "agent_version": "0.1.0",
+  "capabilities": [
+    "cpu",
+    "ram",
+    "disk",
+    "processes"
+  ],
+  "expires_at": "2026-11-21T01:00:00Z"
+}
