@@ -53,7 +53,26 @@ jobs:
             Start-Sleep -Seconds 1
           }
           $service = Get-Service -Name FleetLumaAgent -ErrorAction Stop
-          if ($service.Status -ne "Running") { throw "FleetLumaAgent is not running after install" }
+          if ($service.Status -ne "Running") {
+            Write-Output "SCM diagnosis:"
+            & sc.exe queryex FleetLumaAgent
+            & sc.exe qc FleetLumaAgent
+            Write-Output "Recent Service Control Manager events:"
+            Get-WinEvent -FilterHashtable @{
+              LogName='System'
+              ProviderName='Service Control Manager'
+              StartTime=(Get-Date).AddMinutes(-15)
+            } -MaxEvents 12 -ErrorAction SilentlyContinue |
+              Select-Object TimeCreated,Id,Message | Format-List | Out-String -Width 180 | Write-Output
+            Write-Output "Recent Application errors:"
+            Get-WinEvent -FilterHashtable @{
+              LogName='Application'
+              Level=2
+              StartTime=(Get-Date).AddMinutes(-15)
+            } -MaxEvents 8 -ErrorAction SilentlyContinue |
+              Select-Object TimeCreated,ProviderName,Message | Format-List | Out-String -Width 180 | Write-Output
+            throw "FleetLumaAgent is not running after install"
+          }
           $sid = & sc.exe qsidtype FleetLumaAgent | Out-String
           if ($sid -notmatch "UNRESTRICTED") { throw "Service SID was not enabled" }
           if (!(Test-Path "${env:ProgramData}\FleetLuma\private")) { throw "Credential directory missing" }
