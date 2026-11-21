@@ -11,5 +11,5 @@ note right of DB : No sample, process or heartbeat mutation.
 Agent -> API : POST malformed report + valid ACTIVE token
 API -> API : Payload schema validation fails
 API --> Agent : HTTP 422 Invalid Request
-note bottom : Never log raw tokens, enrollment secrets or passwords.
+note over API,DB : Never log raw tokens or pairing secrets.
 @enduml
