@@ -3,15 +3,28 @@
   "info": {
     "title": "FleetLuma API",
     "version": "0.1.0",
-    "description": "FL-6 contract-first design for local-network proof-of-concept. Agent token authentication is required for ingestion. Read-only mobile routes intentionally have no authentication in the controlled LAN demo: do not expose them on untrusted networks."
+    "description": "FleetLuma v0.1.0 target cloud contract. The pairing/device-management operations are DESIGN ONLY until runtime implementation and tests are merged. Existing cloud monitoring routes are live and require approved Supabase JWTs; agent reports use separate per-host credentials."
   },
   "servers": [
     {
+      "url": "https://fleetluma-api.vercel.app",
+      "description": "Planned stable cloud API domain; configure before release (not proof of an active hostname)"
+    },
+    {
       "url": "http://127.0.0.1:8000",
-      "description": "Coordinator host local development (emulators and physical phones must use reachable LAN/loopback mapping)"
+      "description": "Local development only; never use over untrusted LAN"
     }
   ],
   "tags": [
+    {
+      "name": "Enrollment - agent"
+    },
+    {
+      "name": "Enrollment - operator"
+    },
+    {
+      "name": "Device management"
+    },
     {
       "name": "Agent"
     },
@@ -26,7 +39,7 @@
           "Agent"
         ],
         "summary": "Accept authenticated host monitoring report",
-        "description": "Authorization: Bearer token. Server resolves host identity strictly from the token, not a client-supplied host_id. Only a fully validated and transactionally committed report updates last_seen_at. captured_at sampled_at is the agent clock; received_at is coordinator UTC time. Duplicate reports are allowed as separate samples in MVP; retries may yield duplicates. No remote commands.",
+        "description": "Authorization: Bearer token. Server resolves host identity strictly from the token, not a client-supplied host_id. Only a fully validated and transactionally committed report updates last_seen_at. captured_at sampled_at is the agent clock; received_at is coordinator UTC time. Duplicate reports are allowed as separate samples in MVP; retries may yield duplicates. No remote commands. v0.1.0 target also requires ACTIVE host lifecycle and workspace binding; revoked token must return 401 without DB mutation.",
         "security": [
           {
             "AgentToken": []
@@ -103,6 +116,26 @@
               }
             }
           },
+          "401": {
+            "description": "Unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden or denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
           "500": {
             "description": "Error response",
             "content": {
@@ -113,7 +146,13 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "OperatorJwt": []
+          }
+        ],
+        "description": " In cloud mode an approved operator JWT and workspace-scoped authorization are required. Design target; existing runtime currently enforces global approved-operator allowlist."
       }
     },
     "/api/v1/hosts/{id}": {
@@ -144,6 +183,26 @@
               }
             }
           },
+          "401": {
+            "description": "Unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden or denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
           "404": {
             "description": "Error response",
             "content": {
@@ -154,7 +213,13 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "OperatorJwt": []
+          }
+        ],
+        "description": " In cloud mode an approved operator JWT and workspace-scoped authorization are required. Design target; existing runtime currently enforces global approved-operator allowlist."
       }
     },
     "/api/v1/hosts/{id}/history": {
@@ -163,7 +228,7 @@
           "Mobile"
         ],
         "summary": "Get 24-hour-retained time series",
-        "description": "At most 24h. Use sampled_at for measurements, received_at for freshness; output is ordered ascending.",
+        "description": "At most 24h. Use sampled_at for measurements, received_at for freshness; output is ordered ascending. In cloud mode an approved operator JWT and workspace-scoped authorization are required. Design target; existing runtime currently enforces global approved-operator allowlist.",
         "parameters": [
           {
             "name": "id",
@@ -200,6 +265,26 @@
               }
             }
           },
+          "401": {
+            "description": "Unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden or denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
           "404": {
             "description": "Error response",
             "content": {
@@ -220,7 +305,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "OperatorJwt": []
+          }
+        ]
       }
     },
     "/api/v1/hosts/{id}/processes": {
@@ -229,7 +319,7 @@
           "Mobile"
         ],
         "summary": "Get latest read-only process snapshot",
-        "description": "An absent snapshot returns captured_at null with an empty array. CPU percent may exceed 100 on multi-core systems.",
+        "description": "An absent snapshot returns captured_at null with an empty array. CPU percent may exceed 100 on multi-core systems. In cloud mode an approved operator JWT and workspace-scoped authorization are required. Design target; existing runtime currently enforces global approved-operator allowlist.",
         "parameters": [
           {
             "name": "id",
@@ -252,6 +342,26 @@
               }
             }
           },
+          "401": {
+            "description": "Unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden or denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
           "404": {
             "description": "Error response",
             "content": {
@@ -262,7 +372,12 @@
               }
             }
           }
-        }
+        },
+        "security": [
+          {
+            "OperatorJwt": []
+          }
+        ]
       }
     },
     "/api/v1/services": {
@@ -271,7 +386,7 @@
           "Mobile"
         ],
         "summary": "List monitored HTTP services",
-        "description": "Service configuration is done out-of-band. A service can have no host_id, and service health is not derived from agent heartbeat.",
+        "description": "Service configuration is done out-of-band. A service can have no host_id, and service health is not derived from agent heartbeat. In cloud mode an approved operator JWT and workspace-scoped authorization are required. Design target; existing runtime currently enforces global approved-operator allowlist.",
         "responses": {
           "200": {
             "description": "ServiceList",
@@ -282,8 +397,33 @@
                 }
               }
             }
+          },
+          "401": {
+            "description": "Unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden or denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
           }
-        }
+        },
+        "security": [
+          {
+            "OperatorJwt": []
+          }
+        ]
       }
     },
     "/api/v1/services/{id}/checks": {
@@ -328,6 +468,26 @@
               }
             }
           },
+          "401": {
+            "description": "Unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden or denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
           "404": {
             "description": "Error response",
             "content": {
@@ -348,7 +508,753 @@
               }
             }
           }
+        },
+        "security": [
+          {
+            "OperatorJwt": []
+          }
+        ],
+        "description": " In cloud mode an approved operator JWT and workspace-scoped authorization are required. Design target; existing runtime currently enforces global approved-operator allowlist."
+      }
+    },
+    "/api/v1/agent/pairings": {
+      "post": {
+        "tags": [
+          "Enrollment - agent"
+        ],
+        "summary": "Agent requests server-generated one-time pairing code",
+        "description": "Architecture contract for v0.1.0; NOT YET IMPLEMENTED. All tokens stay out of URLs, logs and browser; strict server-side throttling.",
+        "security": [],
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PairingCreated"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PairingCreateRequest"
+              }
+            }
+          }
         }
+      }
+    },
+    "/api/v1/agent/pairings/token": {
+      "post": {
+        "tags": [
+          "Enrollment - agent"
+        ],
+        "summary": "Poll pairing outcome with private device session credential; no reporting token returned",
+        "description": "Architecture contract for v0.1.0; NOT YET IMPLEMENTED. All tokens stay out of URLs, logs and browser; strict server-side throttling.",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PairingTokenResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden or denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PairingTokenRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/agent/pairings/cancel": {
+      "post": {
+        "tags": [
+          "Enrollment - agent"
+        ],
+        "summary": "Cancel owned pending pairing using its private device session credential",
+        "description": "Architecture contract for v0.1.0; NOT YET IMPLEMENTED. All tokens stay out of URLs, logs and browser; strict server-side throttling.",
+        "security": [],
+        "responses": {
+          "204": {
+            "description": "No content"
+          },
+          "401": {
+            "description": "Unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PairingTokenRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/operator/pairings/resolve": {
+      "post": {
+        "tags": [
+          "Enrollment - operator"
+        ],
+        "summary": "Resolve visible code to safe device metadata for review",
+        "description": "Architecture contract for v0.1.0; NOT YET IMPLEMENTED. Requires authorized workspace membership and role; never trusts user_metadata.",
+        "security": [
+          {
+            "OperatorJwt": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PairingResolved"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden or denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PairingResolveRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/operator/pairings/{id}/approve": {
+      "post": {
+        "tags": [
+          "Enrollment - operator"
+        ],
+        "summary": "Explicitly approve pending device into authorized workspace",
+        "description": "Architecture contract for v0.1.0; NOT YET IMPLEMENTED. Requires authorized workspace membership and role; never trusts user_metadata.",
+        "security": [
+          {
+            "OperatorJwt": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PairingApprovalResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden or denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "Expired",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PairingApprovalRequest"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/operator/pairings/{id}/deny": {
+      "post": {
+        "tags": [
+          "Enrollment - operator"
+        ],
+        "summary": "Deny pending pairing",
+        "description": "Architecture contract for v0.1.0; NOT YET IMPLEMENTED. Requires authorized workspace membership and role; never trusts user_metadata.",
+        "security": [
+          {
+            "OperatorJwt": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "No content"
+          },
+          "401": {
+            "description": "Unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden or denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/operator/hosts": {
+      "get": {
+        "tags": [
+          "Device management"
+        ],
+        "summary": "List authorized workspace devices and lifecycle",
+        "description": "Architecture contract for v0.1.0; NOT YET IMPLEMENTED. Requires authorized workspace membership and role; never trusts user_metadata.",
+        "security": [
+          {
+            "OperatorJwt": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagedHostList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden or denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/operator/hosts/{id}": {
+      "patch": {
+        "tags": [
+          "Device management"
+        ],
+        "summary": "Rename host within owned/administered workspace",
+        "description": "Architecture contract for v0.1.0; NOT YET IMPLEMENTED. Requires authorized workspace membership and role; never trusts user_metadata.",
+        "security": [
+          {
+            "OperatorJwt": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagedHost"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden or denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HostRenameRequest"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/operator/hosts/{id}/revoke": {
+      "post": {
+        "tags": [
+          "Device management"
+        ],
+        "summary": "Immediately revoke host credential (idempotent)",
+        "description": "Architecture contract for v0.1.0; NOT YET IMPLEMENTED. Requires authorized workspace membership and role; never trusts user_metadata.",
+        "security": [
+          {
+            "OperatorJwt": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagedHost"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden or denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/operator/device-audit": {
+      "get": {
+        "tags": [
+          "Device management"
+        ],
+        "summary": "Read bounded, redacted workspace enrollment audit",
+        "description": "Architecture contract for v0.1.0; NOT YET IMPLEMENTED. Requires authorized workspace membership and role; never trusts user_metadata.",
+        "security": [
+          {
+            "OperatorJwt": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceAuditPage"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden or denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiError"
+                }
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "workspace_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          }
+        ]
       }
     }
   },
@@ -358,6 +1264,11 @@
         "type": "http",
         "scheme": "bearer",
         "bearerFormat": "opaque per-agent token"
+      },
+      "OperatorJwt": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "Supabase JWT ES256/RS256; explicit workspace membership"
       }
     },
     "schemas": {
@@ -567,7 +1478,8 @@
             "enum": [
               "PENDING",
               "CONNECTED",
-              "STALE"
+              "STALE",
+              "REVOKED"
             ]
           },
           "last_seen_at": {
@@ -590,6 +1502,17 @@
                 "type": "null"
               }
             ]
+          },
+          "lifecycle": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "REVOKED"
+            ]
+          },
+          "workspace_id": {
+            "type": "string",
+            "format": "uuid"
           }
         },
         "required": [
@@ -907,6 +1830,366 @@
         },
         "required": [
           "error"
+        ]
+      },
+      "PairingCreateRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "hostname": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "platform": {
+            "type": "string",
+            "enum": [
+              "windows",
+              "linux"
+            ]
+          },
+          "agent_version": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "report_token_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "capabilities": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 40
+            },
+            "maxItems": 20
+          }
+        },
+        "required": [
+          "hostname",
+          "platform",
+          "agent_version",
+          "report_token_sha256",
+          "capabilities"
+        ]
+      },
+      "PairingCreated": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "device_code": {
+            "type": "string",
+            "minLength": 32,
+            "maxLength": 256
+          },
+          "user_code": {
+            "type": "string",
+            "pattern": "^[A-Z2-9]{4}-[A-Z2-9]{4}$"
+          },
+          "verification_uri": {
+            "type": "string",
+            "format": "uri"
+          },
+          "expires_in": {
+            "type": "integer",
+            "const": 600
+          },
+          "interval": {
+            "type": "integer",
+            "minimum": 5
+          }
+        },
+        "required": [
+          "device_code",
+          "user_code",
+          "verification_uri",
+          "expires_in",
+          "interval"
+        ]
+      },
+      "PairingTokenRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "device_code": {
+            "type": "string",
+            "minLength": 32,
+            "maxLength": 256
+          }
+        },
+        "required": [
+          "device_code"
+        ]
+      },
+      "PairingTokenResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "paired"
+            ]
+          },
+          "host_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "workspace_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "PairingResolveRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "user_code": {
+            "type": "string",
+            "pattern": "^[A-Z2-9]{4}-[A-Z2-9]{4}$"
+          }
+        },
+        "required": [
+          "user_code"
+        ]
+      },
+      "PairingResolved": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "pairing_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "hostname": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "platform": {
+            "type": "string",
+            "enum": [
+              "windows",
+              "linux"
+            ]
+          },
+          "agent_version": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "capabilities": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 40
+            }
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "pairing_id",
+          "hostname",
+          "platform",
+          "agent_version",
+          "capabilities",
+          "expires_at"
+        ]
+      },
+      "PairingApprovalRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "workspace_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "workspace_id"
+        ]
+      },
+      "PairingApprovalResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "approved"
+            ]
+          },
+          "host_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "workspace_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "status",
+          "host_id",
+          "workspace_id"
+        ]
+      },
+      "HostRenameRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 64
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "ManagedHost": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "workspace_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 64
+          },
+          "os": {
+            "type": "string",
+            "enum": [
+              "windows",
+              "linux"
+            ]
+          },
+          "lifecycle": {
+            "type": "string",
+            "enum": [
+              "ACTIVE",
+              "REVOKED"
+            ]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "PENDING",
+              "CONNECTED",
+              "STALE",
+              "REVOKED"
+            ]
+          },
+          "agent_version": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "last_seen_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "workspace_id",
+          "name",
+          "os",
+          "lifecycle",
+          "status",
+          "last_seen_at"
+        ]
+      },
+      "ManagedHostList": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ManagedHost"
+            }
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "DeviceAuditEvent": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "host_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "action": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 60
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "details": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "id",
+          "action",
+          "created_at",
+          "details"
+        ]
+      },
+      "DeviceAuditPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DeviceAuditEvent"
+            }
+          },
+          "has_more": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "items",
+          "has_more"
         ]
       }
     }
