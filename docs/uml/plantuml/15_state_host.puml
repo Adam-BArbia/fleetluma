@@ -1,8 +1,14 @@
 @startuml 15_state_host
-[*] --> PENDING
-PENDING --> CONNECTED : first accepted report
-CONNECTED --> CONNECTED : accepted report
-CONNECTED --> STALE : silence > threshold
+title Host reporting state and revocation precedence (target)
+[*] --> PENDING : approved + registered, no sample
+PENDING --> CONNECTED : first valid report
+CONNECTED --> CONNECTED : report accepted
+CONNECTED --> STALE : silence > 35 seconds
 STALE --> CONNECTED : valid report received
-note right of STALE: Agent data is old; physical host power is unknown.
+PENDING --> REVOKED : admin revoke
+CONNECTED --> REVOKED : admin revoke
+STALE --> REVOKED : admin revoke
+REVOKED --> [*] : retained for audit / optional later purge
+note right of STALE : Stale is last-known, NOT proof of host shutdown.
+note right of REVOKED : Rejection immediate; old token never valid again.
 @enduml
