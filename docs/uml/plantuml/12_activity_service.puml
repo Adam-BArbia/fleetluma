@@ -1,17 +1,23 @@
 @startuml 12_activity_service
+title Approved HTTP check - external FL-19 scheduled worker
 start
-:Scheduler selects approved enabled service;
-:Start bounded HTTP request;
-if (Response received?) then (yes)
- :Record status code and latency;
- if (Code is 2xx/3xx?) then (yes)
- :Set HEALTHY result;
+:Supabase scheduled worker selects enabled service in workspace;
+:Apply approved destination and SSRF protections;
+if (Public endpoint allowed?) then (yes)
+ :Start bounded HTTP GET with no redirects to private address;
+ if (Response received?) then (yes)
+  :Record HTTP status code and latency;
+  if (Approved success status?) then (yes)
+   :Persist HEALTHY result;
+  else (no)
+   :Persist UNHEALTHY result;
+  endif
  else (no)
- :Set UNHEALTHY (HTTP response);
+  :Persist UNHEALTHY timeout/network failure;
  endif
 else (no)
- :Set UNHEALTHY (timeout/network error);
+ :Reject unsafe URL without network access;
 endif
-:Persist service check;
+:Write check into private PostgreSQL;
 stop
 @enduml
