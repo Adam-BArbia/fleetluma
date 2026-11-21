@@ -32,6 +32,11 @@ jobs:
         run: |
           python -m PyInstaller --noconfirm --clean --onedir --name FleetLumaAgent --paths agent --hidden-import servicemanager --hidden-import win32timezone --hidden-import win32serviceutil --hidden-import win32pipe --hidden-import win32security agent/packaging/windows/service_entry.py
           python -m PyInstaller --noconfirm --clean --onefile --windowed --uac-admin --name FleetLumaSetup --paths agent agent/packaging/windows/setup_entry.py
+      - name: Validate frozen Windows service imports without SCM
+        shell: pwsh
+        run: |
+          & "dist/FleetLumaAgent/FleetLumaAgent.exe" --self-test
+          if ($LASTEXITCODE -ne 0) { throw "Frozen Windows service import validation failed" }
       - name: Compile unsigned installer
         shell: pwsh
         run: |
