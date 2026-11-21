@@ -101,13 +101,17 @@ class _DeviceManagementScreenState extends State<DeviceManagementScreen> {
     final preview = _preview;
     if (preview == null) return;
     await widget.api.deny(preview.pairingId);
-    if (mounted) setState(() { _preview = null; _code.clear(); });
+    if (mounted) {
+      setState(() { _preview = null; _code.clear(); });
+    }
   });
 
   Future<void> _changeWorkspace(String? id) => _perform(() async {
     if (id == null) return;
     final devices = await widget.api.hosts(id);
-    if (mounted) setState(() { _workspaceId = id; _devices = devices; _preview = null; });
+    if (mounted) {
+      setState(() { _workspaceId = id; _devices = devices; _preview = null; });
+    }
   });
 
   Future<void> _confirmRevoke(ManagedDevice device) async {
