@@ -19,7 +19,7 @@ if sys.platform == "win32":
     from .secure_state import ProtectedCredentialStore
     from .pairing_client import PairingHttpClient
     from .service_runtime import EnrollmentController
-    from .local_control import automatic_poller
+    from .pairing_poller import automatic_poller
     from .windows_control import WindowsControlServer
 
     class FleetLumaWindowsService(win32serviceutil.ServiceFramework):
