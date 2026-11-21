@@ -91,7 +91,8 @@ def create_cloud_app(store_factory=PostgresStore, pairing_store_factory=None):
     def history(id: str, window: str = Query(default="1h", pattern="^(15m|1h|24h)$"),
                 operator: str = Depends(require_operator)):
         try:
-            row = store_factory().host(id)
+            row = (store_factory().host_scoped(id, operator)
+                   if pairing_enabled else store_factory().host(id))
         except ValueError:
             row = None
         if row is None:
@@ -102,7 +103,8 @@ def create_cloud_app(store_factory=PostgresStore, pairing_store_factory=None):
     @app.get("/api/v1/hosts/{id}/processes")
     def processes(id: str, operator: str = Depends(require_operator)):
         try:
-            row = store_factory().host(id)
+            row = (store_factory().host_scoped(id, operator)
+                   if pairing_enabled else store_factory().host(id))
         except ValueError:
             row = None
         if row is None:
