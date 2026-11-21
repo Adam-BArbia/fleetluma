@@ -119,7 +119,9 @@ class HttpFleetDeviceApi implements FleetDeviceApi {
     final httpClient = client ?? http.Client();
     try {
       final request = http.Request(method, uri)
-        ..headers.addAll(headers);
+        ..headers.addAll(headers)
+        ..followRedirects = false
+        ..maxRedirects = 0;
       if (body != null) request.body = jsonEncode(body);
       final streamed = await httpClient.send(request).timeout(timeout);
       final response = await http.Response.fromStream(streamed).timeout(timeout);
