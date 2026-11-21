@@ -353,3 +353,15 @@ class PostgresStore:
                 rows=cur.fetchall()
         return {"service_id":service_id,"window":window,
                 "items":[dict(r,checked_at=iso(r["checked_at"])) for r in rows]}
+
+    def service_visible_to(self, service_id, actor):
+        service_id, actor = self._uuid(service_id), self._uuid(actor)
+        with self._connect() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                  SELECT 1 FROM fleetluma.services s
+                  JOIN fleetluma.workspace_memberships m
+                    ON m.workspace_id=s.workspace_id
+                  WHERE s.id=%s AND m.user_id=%s
+                """,(service_id,actor))
+                return cur.fetchone() is not None
