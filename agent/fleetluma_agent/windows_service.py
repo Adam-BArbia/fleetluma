@@ -71,9 +71,9 @@ def main():
     if sys.platform != "win32":
         raise RuntimeError("Windows SCM wrapper must run on Windows")
     import win32serviceutil
-    if getattr(sys, "frozen", False) and len(sys.argv) == 1:
-        # A frozen executable launched by Windows SCM (not PythonService.exe)
-        # must register its own single-service dispatcher.
+    if getattr(sys, "frozen", False):
+        # This binary is dedicated to the SCM. Always dispatch when frozen;
+        # Windows SCM may supply arguments that must not trigger CLI handling.
         import servicemanager
         servicemanager.Initialize()
         servicemanager.PrepareToHostSingle(FleetLumaWindowsService)
