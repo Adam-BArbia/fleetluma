@@ -18,6 +18,7 @@ import threading
 from dataclasses import asdict
 
 from .service_runtime import EnrollmentController
+from .pairing_client import PairingRejected
 
 LOG = logging.getLogger("fleetluma.agent.windows_control")
 PIPE_NAME = r"\\.\pipe\FleetLumaAgent-Control-v1"
@@ -56,7 +57,7 @@ def dispatch_control(controller: EnrollmentController, raw: bytes) -> bytes:
         # Explicit output allowlist, even if controller changes later.
         result = {key: result.get(key) for key in
                   ("status", "user_code", "verification_uri", "expires_in", "host_id")}
-    except (ValueError, OSError, RuntimeError, TypeError):
+    except (ValueError, OSError, RuntimeError, TypeError, PairingRejected):
         result = {"status": "error", "message": "Pairing action unavailable"}
     payload = json.dumps(result, separators=(",", ":")).encode("utf-8")
     if len(payload) > MAX_MESSAGE:
