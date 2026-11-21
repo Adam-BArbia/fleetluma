@@ -1,10 +1,67 @@
 @startuml 03_class_domain
-class Host {
+title FleetLuma domain model - v0.1.0 target (design)
+class Workspace {
  +id: UUID
  +name: String
+ +createdBy: UUID
+}
+class WorkspaceMembership {
+ +workspaceId: UUID
+ +userId: UUID
+ +role: MembershipRole
+}
+enum MembershipRole {
+ OWNER
+ ADMIN
+ VIEWER
+}
+class PairingSession {
+ +id: UUID
+ +userCodeHash: String
+ +deviceCodeHash: String
+ +reportTokenHash: String
+ +expiresAt: Instant
+ +status: PairingState
+ +approvedBy: UUID?
+ +workspaceId: UUID?
+ +hostId: UUID?
+}
+enum PairingState {
+ PENDING
+ APPROVED
+ CONSUMED
+ DENIED
+ EXPIRED
+ CANCELLED
+}
+class Host {
+ +id: UUID
+ +workspaceId: UUID
+ +name: String
  +os: String
+ +agentVersion: String?
+ +tokenHash: String
+ +lifecycle: HostLifecycle
  +lastSeenAt: Instant?
  +connectionState(now): HostState
+}
+enum HostLifecycle {
+ ACTIVE
+ REVOKED
+}
+enum HostState {
+ PENDING
+ CONNECTED
+ STALE
+ REVOKED
+}
+class DeviceAuditEvent {
+ +id: UUID
+ +workspaceId: UUID?
+ +hostId: UUID?
+ +pairingId: UUID?
+ +action: String
+ +createdAt: Instant
 }
 class MetricSample {
  +receivedAt: Instant
@@ -15,7 +72,7 @@ class MetricSample {
  +diskTotalBytes: Long
 }
 class ProcessSnapshot {
-  +capturedAt: Instant
+ +capturedAt: Instant
 }
 class ProcessEntry {
  +pid: Integer
@@ -34,19 +91,28 @@ class ServiceCheck {
  +latencyMs: Float?
  +result: CheckResult
 }
-enum HostState {
-  PENDING
-  CONNECTED
-  STALE
-}
 enum CheckResult {
-  UNKNOWN
-  HEALTHY
-  UNHEALTHY
+ UNKNOWN
+ HEALTHY
+ UNHEALTHY
 }
+Workspace "1" -- "0..*" WorkspaceMembership
+WorkspaceMembership --> MembershipRole
+Workspace "1" -- "0..*" Host
+Workspace "0..1" -- "0..*" PairingSession
+PairingSession --> PairingState
+PairingSession "0..1" --> "0..1" Host : approved enrollment
+Workspace "0..1" -- "0..*" DeviceAuditEvent
+Host --> HostLifecycle
+Host --> HostState
 Host "1" -- "0..*" MetricSample
 Host "1" -- "0..1" ProcessSnapshot
 ProcessSnapshot "1" *-- "0..10" ProcessEntry
 Host "0..1" -- "0..*" MonitoredService
 MonitoredService "1" -- "0..*" ServiceCheck
+note bottom of Host
+ Reporting state derives from server receipt timestamp,
+ except REVOKED takes precedence.
+ TUFFEST ID and samples survive additive migration.
+end note
 @enduml
