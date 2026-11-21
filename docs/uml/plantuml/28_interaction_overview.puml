@@ -1,14 +1,18 @@
 @startuml 28_interaction_overview
+title V0.1.0 pilot acceptance interaction overview
 start
-:Provision agent A and B;
-:Run initial report interaction;
-:Open mobile fleet interaction;
-:Display live metrics/history/processes;
-:Stop controlled HTTP demo service;
-:Run scheduled check interaction;
-:Observe service UNHEALTHY;
-:Restart service and observe HEALTHY;
-:Stop agent and wait for STALE threshold;
-:Explain that stale agent != powered-off host;
+:Install signed Windows / Ubuntu-Debian agent package;
+:User initiates pairing in local setup UI;
+:Operator verifies code and approves in dashboard;
+:Service starts HTTPS reporting at boot;
+:FastAPI persists samples + process snapshot;
+:Operator views workspace-scoped metrics/history;
+:Stop agent; observe STALE + last-known notice;
+:Restart agent; observe CONNECTED without re-pair;
+:Test revoked token 401 + unchanged heartbeat;
+:Test nonmember/viewer cannot approve/revoke;
+:Test uninstall, service restart and credential persistence;
+:Test Linux and Windows independently;
+:Verify production release and rollback checklist;
 stop
 @enduml
