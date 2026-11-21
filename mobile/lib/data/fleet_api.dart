@@ -18,7 +18,6 @@ class HttpFleetApi implements FleetApi {
   final Duration timeout;
   final http.Client? _injectedClient;
   final Future<String?> Function()? tokenProvider;
-  // Workspace-scoped API is enabled only after cloud onboarding rollout.
   final Future<String?> Function()? workspaceIdProvider;
 
   HttpFleetApi({
@@ -40,79 +39,12 @@ class HttpFleetApi implements FleetApi {
     final client = _injectedClient ?? http.Client();
     try {
       final workspaceId = await workspaceIdProvider?.call();
-      if (workspaceIdProvider != null && (workspaceId == null || workspaceId.isEmpty)) {
+      if (workspaceIdProvider != null &&
+          (workspaceId == null || workspaceId.isEmpty)) {
         throw const FleetAccessDeniedException();
       }
       final endpoint = baseUri.replace(
-        path: '${baseUri.path.replaceFirst(RegExp(r'/
-      final headers = <String, String>{'Accept': 'application/json'};
-      if (tokenProvider != null) {
-        final jwt = await tokenProvider!();
-        if (jwt == null || jwt.isEmpty) {
-          throw const FleetSessionExpiredException();
-        }
-        headers['Authorization'] = 'Bearer $jwt';
-      }
-      final response = await client
-          .get(endpoint, headers: headers)
-          .timeout(timeout);
-      if (response.statusCode == 401 && tokenProvider != null) {
-        throw const FleetSessionExpiredException();
-      }
-      if (response.statusCode == 403 && tokenProvider != null) {
-        throw const FleetAccessDeniedException();
-      }
-      if (response.statusCode != 200) {
-        throw FleetConnectionException(
-          'Coordinator returned HTTP ${response.statusCode}.',
-        );
-      }
-      final decoded = jsonDecode(response.body);
-      if (decoded is! Map<String, dynamic> || decoded['items'] is! List) {
-        throw const FormatException('Unexpected fleet response shape');
-      }
-      final items = decoded['items'] as List<dynamic>;
-      return items
-          .map((item) => HostSnapshot.fromJson(
-                Map<String, dynamic>.from(item as Map),
-              ))
-          .toList(growable: false);
-    } on TimeoutException {
-      throw const FleetConnectionException(
-        'Coordinator request timed out. Check the backend address.',
-      );
-    } on http.ClientException {
-      throw const FleetConnectionException(
-        'Cannot reach the coordinator. Check your network and backend URL.',
-      );
-    } on FormatException {
-      throw const FleetConnectionException('The server returned invalid data.');
-    } on TypeError {
-      throw const FleetConnectionException('Unexpected API response format.');
-    } finally {
-      if (_injectedClient == null) client.close();
-    }
-  }
-}
-
-class FleetConnectionException implements Exception {
-  final String message;
-  const FleetConnectionException(this.message);
-
-  @override
-  String toString() => message;
-}
-
-class FleetSessionExpiredException extends FleetConnectionException {
-  const FleetSessionExpiredException()
-      : super('Session expired. Sign in again.');
-}
-
-class FleetAccessDeniedException extends FleetConnectionException {
-  const FleetAccessDeniedException()
-      : super('Your account is not yet approved to view this fleet. Contact the fleet administrator.');
-}
-), '')}/api/v1/hosts',
+        path: '${baseUri.path.replaceFirst(RegExp(r'/$'), '')}/api/v1/hosts',
         queryParameters: workspaceId == null ? null : {'workspace_id': workspaceId},
       );
       final headers = <String, String>{'Accept': 'application/json'};
