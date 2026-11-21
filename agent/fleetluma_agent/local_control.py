@@ -124,13 +124,5 @@ def command(path: Path, action: str, timeout: float = 3.0) -> dict:
         return result
 
 
-def automatic_poller(controller: EnrollmentController,
-                     stop_event: threading.Event, interval: float = 1.0) -> None:
-    """No user-level shell needed while waiting for dashboard approval."""
-    while not stop_event.is_set():
-        try:
-            if controller.status().status == "waiting":
-                controller.poll_once()
-        except (PairingRejected, OSError, RuntimeError, ValueError) as exc:
-            LOG.warning("Pairing poll failed (%s)", type(exc).__name__)
-        stop_event.wait(interval)
+# Backward-compatible export for existing Linux acceptance tests.
+from .pairing_poller import automatic_poller
