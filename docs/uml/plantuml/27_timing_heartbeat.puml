@@ -1,6 +1,6 @@
 @startuml 27_timing_heartbeat
-title Host heartbeat freshness (illustrative, each unit = 10 s)
-robust "Host connection state" as H
+title Host freshness after approved pairing (illustrative; 1 unit = 10 s)
+robust "Host reporting state" as H
 @0
 H is PENDING
 @1
@@ -14,9 +14,11 @@ H is STALE
 @8
 H is CONNECTED
 legend bottom
+  Registration occurs after operator-approved pairing.
   Accepted reports at t=10, 20, 30 and 80 seconds.
-  At t=70, no report has arrived for 40 seconds:
-  beyond the proposed 35-second stale threshold.
-  STALE does not prove the physical host is powered off.
+  At t=70 the last accepted report is 40s old,
+  exceeding the 35-second stale threshold.
+  A revocation supersedes both CONNECTED and STALE.
+  STALE does not establish physical machine shutdown.
 endlegend
 @enduml
