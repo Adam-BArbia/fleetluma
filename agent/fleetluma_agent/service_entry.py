@@ -80,7 +80,8 @@ def start_linux_control(store, stop_event, origin, runtime_dir=Path("/run/fleetl
         raise RuntimeError("Linux control requires Linux")
     from .pairing_client import PairingHttpClient
     from .service_runtime import EnrollmentController
-    from .local_control import PrivateUnixControlServer, automatic_poller
+    from .local_control import PrivateUnixControlServer
+    from .pairing_poller import automatic_poller
     client = PairingHttpClient(origin)  # must be trusted HTTPS
     controller = EnrollmentController(store, client)
     server = PrivateUnixControlServer(runtime_dir / "control.sock", controller)

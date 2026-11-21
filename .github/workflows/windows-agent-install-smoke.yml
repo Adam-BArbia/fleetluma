@@ -1,0 +1,133 @@
+name: Windows agent installer isolated acceptance
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'agent/**'
+      - '.github/workflows/windows-agent-install-smoke.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  isolated-windows-acceptance:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Prepare native candidate build tools
+        shell: pwsh
+        run: |
+          python -m pip install -r agent/requirements.txt
+          python -m pip install "pyinstaller==6.16.0"
+          choco install innosetup --yes --no-progress
+      - name: Run agent unit tests
+        working-directory: agent
+        shell: pwsh
+        run: python -m unittest discover -s tests -v
+      - name: Freeze Windows service and setup UI
+        shell: pwsh
+        run: |
+          python -m PyInstaller --noconfirm --clean --onedir --name FleetLumaAgent --paths agent --hidden-import servicemanager --hidden-import win32timezone --hidden-import win32serviceutil --hidden-import win32pipe --hidden-import win32security agent/packaging/windows/service_entry.py
+          python -m PyInstaller --noconfirm --clean --onefile --windowed --uac-admin --name FleetLumaSetup --paths agent agent/packaging/windows/setup_entry.py
+      - name: Validate frozen Windows service imports without SCM
+        shell: pwsh
+        run: |
+          & "dist/FleetLumaAgent/FleetLumaAgent.exe" --self-test
+          if ($LASTEXITCODE -ne 0) { throw "Frozen Windows service import validation failed" }
+      - name: Compile unsigned installer
+        shell: pwsh
+        run: |
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "agent/packaging/windows/FleetLumaAgent.iss"
+          if ($LASTEXITCODE -ne 0) { throw "Installer compilation failed" }
+      - name: Verify installer process launches and registers service
+        shell: pwsh
+        run: |
+          $installer = (Resolve-Path "dist/windows-installer/FleetLuma-Agent-Windows-UNSIGNED-CANDIDATE.exe").Path
+          $log = Join-Path $env:RUNNER_TEMP "fleetluma-install.log"
+          $proc = Start-Process -FilePath $installer -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART","/SP-",("/LOG=" + $log) -PassThru
+          if (!$proc.WaitForExit(120000)) {
+            Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
+            throw "Inno installer did not finish within bounded test duration"
+          }
+          if (Test-Path $log) {
+            $relevant = Get-Content $log | Where-Object { $_ -match "FleetLuma|sc.exe|icacls|error|exception|failed|exit code" }
+            $relevant | Select-Object -Last 60 | ForEach-Object { Write-Output $_ }
+          }
+          if ($proc.ExitCode -ne 0) { throw "Inno installer returned exit $($proc.ExitCode)" }
+          for ($i = 0; $i -lt 30; $i++) {
+            $service = Get-Service -Name FleetLumaAgent -ErrorAction SilentlyContinue
+            if ($service -and $service.Status -eq "Running") { break }
+            Start-Sleep -Seconds 1
+          }
+          $service = Get-Service -Name FleetLumaAgent -ErrorAction SilentlyContinue
+          if (!$service) {
+            & sc.exe query FleetLumaAgent
+            throw "FleetLuma service not registered; inspect Inno installer event log above"
+          }
+          if ($service.Status -ne "Running") {
+            Write-Output "SCM diagnosis:"
+            & sc.exe queryex FleetLumaAgent
+            & sc.exe qc FleetLumaAgent
+            Write-Output "Recent Service Control Manager events:"
+            Get-WinEvent -FilterHashtable @{
+              LogName='System'
+              ProviderName='Service Control Manager'
+              StartTime=(Get-Date).AddMinutes(-15)
+            } -MaxEvents 12 -ErrorAction SilentlyContinue |
+              Select-Object TimeCreated,Id,Message | Format-List | Out-String -Width 180 | Write-Output
+            Write-Output "Recent Application errors:"
+            Get-WinEvent -FilterHashtable @{
+              LogName='Application'
+              Level=2
+              StartTime=(Get-Date).AddMinutes(-15)
+            } -MaxEvents 8 -ErrorAction SilentlyContinue |
+              Select-Object TimeCreated,ProviderName,Message | Format-List | Out-String -Width 180 | Write-Output
+            throw "FleetLumaAgent is not running after install"
+          }
+          $pathName = (Get-CimInstance Win32_Service -Filter "Name='FleetLumaAgent'").PathName
+          if (!$pathName.StartsWith('"')) {
+            throw "The service binary path is not quoted. Refuse unquoted service paths."
+          }
+          $sid = & sc.exe qsidtype FleetLumaAgent | Out-String
+          if ($sid -notmatch "UNRESTRICTED") { throw "Service SID was not enabled" }
+          if (!(Test-Path "${env:ProgramData}\FleetLuma\private")) { throw "Credential directory missing" }
+          Write-Output "Isolated Windows SCM start OK. No production enrollment requested."
+      - name: Verify local pipe status without credentials
+        working-directory: agent
+        shell: pwsh
+        run: |
+          python -c "from fleetluma_agent.windows_control import windows_command; result=windows_command('status'); assert result.get('status')=='not_paired', result.get('status'); assert 'report_token' not in result; assert 'device_code' not in result; print('Restricted pipe status response OK')"
+      - name: Verify no broad access on protected identity directory
+        shell: pwsh
+        run: |
+          $path = "${env:ProgramData}\FleetLuma\private"
+          $acl = Get-Acl -Path $path
+          foreach ($rule in $acl.Access) {
+            if ($rule.AccessControlType -eq "Allow" -and
+                $rule.IdentityReference.Value -match "Everyone|Users|Authenticated Users") {
+              throw "Overbroad access to private service state: $($rule.IdentityReference)"
+            }
+          }
+          Write-Output "No explicit broad Windows directory allow ACEs found"
+      - name: Uninstall and verify Windows service removal
+        shell: pwsh
+        run: |
+          $uninstaller = "${env:ProgramFiles}\FleetLuma\unins000.exe"
+          if (!(Test-Path $uninstaller)) { throw "Expected uninstaller missing" }
+          $proc = Start-Process -FilePath $uninstaller -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART" -PassThru
+          if (!$proc.WaitForExit(120000)) {
+            Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
+            throw "Inno uninstaller did not finish within bounded test duration"
+          }
+          if ($proc.ExitCode -ne 0) { throw "Uninstaller returned exit $($proc.ExitCode)" }
+          Start-Sleep -Seconds 2
+          if (Get-Service -Name FleetLumaAgent -ErrorAction SilentlyContinue) {
+            throw "FleetLuma service still registered after uninstall"
+          }
+          if (Test-Path "${env:ProgramData}\FleetLuma\private\identity.bin") {
+            throw "Device credential survived explicit uninstall"
+          }
+          Write-Output "Isolated uninstall OK"
