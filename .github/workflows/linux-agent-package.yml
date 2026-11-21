@@ -1,0 +1,52 @@
+name: Linux Debian agent package candidate
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'agent/**'
+      - '.github/workflows/linux-agent-package.yml'
+  pull_request:
+    paths:
+      - 'agent/**'
+      - '.github/workflows/linux-agent-package.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build-deb-candidate:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install agent and packaging dependencies
+        run: |
+          python -m pip install -r agent/requirements.txt
+          python -m pip install "pyinstaller==6.16.0"
+      - name: Test agent on Linux
+        working-directory: agent
+        run: python -m unittest discover -s tests -v
+      - name: Verify Debian maintainer script syntax
+        run: |
+          sh -n agent/packaging/linux/debian/postinst
+          sh -n agent/packaging/linux/debian/prerm
+          sh -n agent/packaging/linux/debian/postrm
+          sh -n agent/packaging/linux/build_deb.sh
+      - name: Build unsigned Debian package
+        run: sh agent/packaging/linux/build_deb.sh
+      - name: Verify package metadata and payload
+        run: |
+          test -s FleetLuma-Linux-UNSIGNED-CANDIDATE.deb
+          dpkg-deb --info FleetLuma-Linux-UNSIGNED-CANDIDATE.deb
+          dpkg-deb --contents FleetLuma-Linux-UNSIGNED-CANDIDATE.deb > /tmp/fleetluma-deb-contents.txt
+          grep -F 'usr/lib/fleetluma/fleetluma-agent' /tmp/fleetluma-deb-contents.txt
+          grep -F 'usr/bin/fleetluma-control' /tmp/fleetluma-deb-contents.txt
+          grep -F 'lib/systemd/system/fleetluma-agent.service' /tmp/fleetluma-deb-contents.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: fleetluma-linux-unsigned-deb-candidate
+          path: FleetLuma-Linux-UNSIGNED-CANDIDATE.deb
+          retention-days: 7
+          if-no-files-found: error
