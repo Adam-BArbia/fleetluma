@@ -60,13 +60,24 @@ def create_cloud_app(store_factory=PostgresStore):
         return accepted
 
     @app.get("/api/v1/hosts")
-    def hosts(operator: str = Depends(require_operator)):
+    def hosts(workspace_id: str | None = Query(default=None),
+              operator: str = Depends(require_operator)):
+        if pairing_enabled:
+            if not workspace_id:
+                raise HTTPException(422, "workspace_id is required")
+            try:
+                return {"items": store_factory().hosts_scoped(operator, workspace_id)}
+            except ValueError:
+                raise HTTPException(422, "Invalid workspace identifier") from None
+            except PermissionError:
+                raise HTTPException(403, "Workspace access denied") from None
         return {"items": store_factory().hosts()}
 
     @app.get("/api/v1/hosts/{id}")
     def host(id: str, operator: str = Depends(require_operator)):
         try:
-            row = store_factory().host(id)
+            row = (store_factory().host_scoped(id, operator)
+                   if pairing_enabled else store_factory().host(id))
         except ValueError:
             row = None
         if row is None:
@@ -82,7 +93,8 @@ def create_cloud_app(store_factory=PostgresStore):
             row = None
         if row is None:
             raise HTTPException(404, "Unknown host")
-        return store_factory().history(id, window)
+        return (store_factory().history_scoped(id, window, operator)
+                if pairing_enabled else store_factory().history(id, window))
 
     @app.get("/api/v1/hosts/{id}/processes")
     def processes(id: str, operator: str = Depends(require_operator)):
@@ -92,10 +104,21 @@ def create_cloud_app(store_factory=PostgresStore):
             row = None
         if row is None:
             raise HTTPException(404, "Unknown host")
-        return store_factory().processes(id)
+        return (store_factory().processes_scoped(id, operator)
+                if pairing_enabled else store_factory().processes(id))
 
     @app.get("/api/v1/services")
-    def services(operator: str = Depends(require_operator)):
+    def services(workspace_id: str | None = Query(default=None),
+                 operator: str = Depends(require_operator)):
+        if pairing_enabled:
+            if not workspace_id:
+                raise HTTPException(422, "workspace_id is required")
+            try:
+                return {"items": store_factory().services_scoped(operator, workspace_id)}
+            except ValueError:
+                raise HTTPException(422, "Invalid workspace identifier") from None
+            except PermissionError:
+                raise HTTPException(403, "Workspace access denied") from None
         return {"items": store_factory().services()}
 
     @app.get("/api/v1/services/{id}/checks")
@@ -105,6 +128,10 @@ def create_cloud_app(store_factory=PostgresStore):
             identifier = str(UUID(id))
         except ValueError:
             raise HTTPException(404, "Unknown service")
+        if pairing_enabled:
+            # Verify authorization via a workspace-scoped query; never expose
+            # the existence of a service owned by another workspace.
+            return store_factory().service_checks_scoped(identifier, window, operator)
         if not any(x["id"] == identifier for x in store_factory().services()):
             raise HTTPException(404, "Unknown service")
         return store_factory().service_checks(identifier, window)
