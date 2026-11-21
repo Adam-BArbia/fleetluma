@@ -10,7 +10,7 @@ import hashlib
 import json
 import secrets
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from ipaddress import ip_address
 from urllib import error, request
 from urllib.parse import urlsplit
@@ -19,7 +19,7 @@ from urllib.parse import urlsplit
 @dataclass(frozen=True)
 class PairingStarted:
     user_code: str
-    device_code: str
+    device_code: str = field(repr=False)
     verification_uri: str
     interval: int
     expires_in: int

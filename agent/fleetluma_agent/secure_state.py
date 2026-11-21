@@ -13,7 +13,7 @@ import os
 import stat
 import sys
 import tempfile
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from uuid import UUID
 
@@ -26,7 +26,7 @@ class CredentialMissing(Exception):
 class AgentIdentity:
     host_id: str
     workspace_id: str
-    report_token: str
+    report_token: str = field(repr=False)
     api_origin: str
 
     def __post_init__(self):
