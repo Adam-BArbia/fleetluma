@@ -107,7 +107,7 @@ class WindowsControlServer:
         while not self._stop.is_set():
             handle = pipe.CreateNamedPipe(
                 PIPE_NAME,
-                pipe.PIPE_ACCESS_DUPLEX,
+                pipe.PIPE_ACCESS_DUPLEX | pipe.FILE_FLAG_FIRST_PIPE_INSTANCE,
                 pipe.PIPE_TYPE_MESSAGE | pipe.PIPE_READMODE_MESSAGE |
                 pipe.PIPE_WAIT | pipe.PIPE_REJECT_REMOTE_CLIENTS,
                 1, 2048, 2048, 2000, self.security_attributes,
