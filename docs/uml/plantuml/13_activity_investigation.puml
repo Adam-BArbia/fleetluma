@@ -1,15 +1,25 @@
 @startuml 13_activity_investigation
+title Workspace-authorized host investigation
 start
-:Open Fleet overview;
-:Select host;
-:Inspect latest CPU, RAM, disk;
-if (Agent data stale?) then (yes)
- :Show last accepted report time;
+:Operator authenticates via Supabase;
+:FastAPI checks operator allowlist and workspace membership;
+if (Authorized to view workspace?) then (yes)
+ :Show workspace-scoped host list;
+ :Select host;
+ if (Host lifecycle REVOKED?) then (yes)
+  :Show revoked status and last-known audit view;
+ else (no)
+  :Inspect latest CPU/RAM/disk;
+  if (Agent data stale?) then (yes)
+   :Show last report time and NOT LIVE notice;
+  else (no)
+   :Display time-series and top processes;
+  endif
+ endif
+ :Open authorized workspace HTTP service (FL-19);
+ :Review latest health check separately from host state;
 else (no)
- :Display trends over chosen time range;
- :Inspect top processes;
+ :Deny access without revealing another workspace;
 endif
-:Open linked or independent HTTP service;
-:Review latest health check;
 stop
 @enduml
