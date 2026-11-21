@@ -14,7 +14,7 @@ from .operator_auth import require_operator, configure_cors, cloud_mode, issuer,
 from .postgres_store import PostgresStore
 
 
-def create_cloud_app(store_factory=PostgresStore):
+def create_cloud_app(store_factory=PostgresStore, pairing_store_factory=None):
     if not cloud_mode():
         raise RuntimeError("Vercel API refuses to start unless FLEETLUMA_MODE=cloud")
     issuer()
@@ -33,7 +33,10 @@ def create_cloud_app(store_factory=PostgresStore):
     configure_cors(app)
     if pairing_enabled:
         from .pairing_routes import make_pairing_router
-        app.include_router(make_pairing_router())
+        if pairing_store_factory is None:
+            from .pairing_store import PairingStore
+            pairing_store_factory = PairingStore
+        app.include_router(make_pairing_router(store_factory=pairing_store_factory))
 
     @app.exception_handler(HTTPException)
     async def http_error(request, exc):
