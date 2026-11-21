@@ -1,15 +1,24 @@
 @startuml 22_seq_fleet_refresh
+title Workspace-authorized fleet refresh
 actor Operator
 participant "Flutter FleetScreen" as UI
-participant "Monitoring API" as API
-database SQLite as DB
+participant "Supabase Auth" as Auth
+participant "FastAPI" as API
+database "Private PostgreSQL" as DB
 Operator -> UI : Open dashboard
-loop Every 5 seconds
- UI -> API : GET /api/v1/hosts
- API -> DB : Fetch latest samples and lastSeenAt
- DB --> API : host data
- API -> API : derive CONNECTED/STALE from receive time
- API --> UI : host list, age and metrics
- UI -> UI : render without fabricating missing values
+UI -> Auth : Existing operator session
+Auth --> UI : JWT
+loop Every 5 seconds while app active
+ UI -> API : GET /api/v1/hosts\nBearer JWT
+ API -> API : Verify JWT issuer/audience/role
+ API -> DB : Read workspace memberships + scoped hosts
+ DB --> API : Allowed host data and latest samples
+ API -> API : Derive CONNECTED / STALE / REVOKED
+ API --> UI : Authorized host list / 401 / 403
+ UI -> UI : Render latest vs stale honestly
 end
+note bottom
+ Current runtime uses global approved-operator allowlist;
+ workspace filtering is v0.1.0 target not yet deployed.
+end note
 @enduml
