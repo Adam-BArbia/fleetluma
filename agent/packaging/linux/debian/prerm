@@ -1,0 +1,10 @@
+#!/bin/sh
+set -eu
+case "${1:-}" in
+  remove|deconfigure|upgrade)
+    if [ -d /run/systemd/system ]; then
+      systemctl stop fleetluma-agent.service || true
+    fi
+    ;;
+esac
+exit 0
