@@ -41,10 +41,15 @@ jobs:
         shell: pwsh
         run: |
           $installer = (Resolve-Path "dist/windows-installer/FleetLuma-Agent-Windows-UNSIGNED-CANDIDATE.exe").Path
-          $proc = Start-Process -FilePath $installer -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART","/SP-" -PassThru
+          $log = Join-Path $env:RUNNER_TEMP "fleetluma-install.log"
+          $proc = Start-Process -FilePath $installer -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART","/SP-",("/LOG=" + $log) -PassThru
           if (!$proc.WaitForExit(120000)) {
             Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
             throw "Inno installer did not finish within bounded test duration"
+          }
+          if (Test-Path $log) {
+            $relevant = Get-Content $log | Where-Object { $_ -match "FleetLuma|sc.exe|icacls|error|exception|failed|exit code" }
+            $relevant | Select-Object -Last 60 | ForEach-Object { Write-Output $_ }
           }
           if ($proc.ExitCode -ne 0) { throw "Inno installer returned exit $($proc.ExitCode)" }
           for ($i = 0; $i -lt 30; $i++) {
@@ -52,7 +57,11 @@ jobs:
             if ($service -and $service.Status -eq "Running") { break }
             Start-Sleep -Seconds 1
           }
-          $service = Get-Service -Name FleetLumaAgent -ErrorAction Stop
+          $service = Get-Service -Name FleetLumaAgent -ErrorAction SilentlyContinue
+          if (!$service) {
+            & sc.exe query FleetLumaAgent
+            throw "FleetLuma service not registered; inspect Inno installer event log above"
+          }
           if ($service.Status -ne "Running") {
             Write-Output "SCM diagnosis:"
             & sc.exe queryex FleetLumaAgent
