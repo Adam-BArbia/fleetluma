@@ -77,5 +77,5 @@ def configure_cors(app):
                     "*" in origin or origin != parsed.geturl()):
                 raise RuntimeError("Cloud CORS only accepts explicit HTTPS origins")
         app.add_middleware(CORSMiddleware, allow_origins=origins,
-                           allow_credentials=False, allow_methods=["GET","OPTIONS"],
+                           allow_credentials=False, allow_methods=["GET","POST","PATCH","OPTIONS"],
                            allow_headers=["Authorization","Content-Type"])
