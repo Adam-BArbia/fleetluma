@@ -353,11 +353,11 @@ class HostCard extends StatelessWidget {
                   style: TextStyle(color: _subtle))
             else ...[
               if (host.status != AgentStatus.connected) ...[
-                const Text(
+                Text(
                   host.status == AgentStatus.revoked
                       ? 'REVOKED · HISTORICAL READINGS'
                       : 'LAST KNOWN READINGS · NOT LIVE',
-                  style: TextStyle(
+                  style: const TextStyle(
                     color: _amber,
                     fontWeight: FontWeight.w700,
                     fontSize: 10,
