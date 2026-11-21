@@ -1,10 +1,11 @@
 /// Models for FL-6 GET /api/v1/hosts. No synthetic data is created here.
-enum AgentStatus { pending, connected, stale }
+enum AgentStatus { pending, connected, stale, revoked }
 
 AgentStatus parseAgentStatus(String value) => switch (value) {
   'PENDING' => AgentStatus.pending,
   'CONNECTED' => AgentStatus.connected,
   'STALE' => AgentStatus.stale,
+  'REVOKED' => AgentStatus.revoked,
   _ => throw FormatException('Unknown host status: $value'),
 };
 
