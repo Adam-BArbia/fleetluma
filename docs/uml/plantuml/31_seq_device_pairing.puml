@@ -1,0 +1,45 @@
+@startuml 31_seq_device_pairing
+title FleetLuma v0.1.0 - Agent initiated pairing (DESIGN ONLY)
+skinparam responseMessageBelowArrow true
+actor "Device user" as User
+participant "Agent Setup UI" as UI
+participant "Agent Background Service" as Agent
+participant "FastAPI (Vercel)" as API
+database "Private PostgreSQL" as DB
+participant "Flutter Dashboard" as Web
+participant "Supabase Auth" as Auth
+actor "Authorized operator" as Operator
+User -> UI : Connect this device
+UI -> Agent : Begin enrollment via local protected IPC
+Agent -> Agent : Generate + securely store 256-bit report token
+Agent -> API : POST /api/v1/agent/pairings\nreport_token_sha256, device metadata
+API -> DB : Create PENDING session; store hashes\n10-minute TTL, rate-limit state
+DB --> API : pairing session
+API --> Agent : user_code, private device_code, interval=5
+Agent --> UI : Show short code + verification URL
+Operator -> Web : Sign in and enter displayed code
+Web -> Auth : Obtain operator JWT
+Auth --> Web : Authenticated JWT
+Web -> API : POST /api/v1/operator/pairings/resolve\nBearer operator JWT + code
+API -> DB : Check code, TTL, rate limits and membership
+DB --> API : Safe device details
+API --> Web : Device metadata for confirmation
+Operator -> Web : Select workspace and APPROVE
+Web -> API : POST /api/v1/operator/pairings/{id}/approve
+API -> DB : Atomic authorization, create ACTIVE host\nBind precommitted report-token hash, audit
+DB --> API : Authorized host
+API --> Web : Approval acknowledged
+loop Poll at >=5 seconds, back off if throttled
+  Agent -> API : POST /api/v1/agent/pairings/token\nPrivate device_code
+  API -> DB : Check private code hash and state
+  DB --> API : PENDING / APPROVED / terminal
+  API --> Agent : Pending or host_id on approved
+end
+Agent -> API : POST /api/v1/agent/reports\nBearer locally held reporting token
+API -> DB : Check hash + lifecycle ACTIVE\nCommit sample + heartbeat
+DB --> API : Accepted
+API --> Agent : HTTP 202
+Agent --> UI : Connected
+Web -> API : GET /api/v1/hosts\nApproved JWT
+API --> Web : Real host status and metrics
+@enduml

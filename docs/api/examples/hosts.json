@@ -17,7 +17,9 @@
         "disk_pct": 50,
         "sampled_at": "2026-11-14T11:30:00Z",
         "received_at": "2026-11-14T11:30:01Z"
-      }
+      },
+      "workspace_id": "23c7bb84-3ab6-4e61-97a2-9d23e83f482b",
+      "lifecycle": "ACTIVE"
     },
     {
       "id": "9e79bd33-8b46-4edc-aa40-f44b1aa2cba5",
@@ -25,7 +27,9 @@
       "os": "windows",
       "status": "STALE",
       "last_seen_at": "2026-11-14T11:26:00Z",
-      "latest_metrics": null
+      "latest_metrics": null,
+      "workspace_id": "23c7bb84-3ab6-4e61-97a2-9d23e83f482b",
+      "lifecycle": "ACTIVE"
     }
   ]
 }

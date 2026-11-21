@@ -1,21 +1,34 @@
 @startuml 02_use_cases_automation
 left to right direction
-actor "Monitoring agent" as Agent
-actor "Check scheduler" as Scheduler
-actor "HTTP endpoint" as Endpoint
-rectangle "FleetLuma coordinator" {
- usecase "Authenticate agent" as Auth
- usecase "Receive metric report" as Ingest
- usecase "Persist samples" as Store
- usecase "Update heartbeat" as Heart
- usecase "Run approved HTTP probe" as Probe
- usecase "Record service result" as Result
+actor "Unpaired device agent" as Unpaired
+actor "Paired device agent" as Agent
+actor "Approved workspace admin" as Admin
+actor "External checker (FL-19)" as Scheduler
+rectangle "FleetLuma cloud API (v0.1.0 design)" {
+ usecase "Request expiring pairing code" as Request
+ usecase "Poll pairing with private device secret" as Poll
+ usecase "Validate admin JWT + membership" as AdminAuth
+ usecase "Approve/deny pairing" as Decide
+ usecase "Register host and token hash atomically" as Register
+ usecase "Authenticate active agent token" as Authenticate
+ usecase "Receive monitoring report" as Ingest
+ usecase "Persist samples + heartbeat atomically" as Persist
+ usecase "Revoke agent" as Revoke
+ usecase "Run approved public HTTP probe (deferred)" as Probe
 }
+Unpaired --> Request
+Unpaired --> Poll
+Admin --> Decide
+Admin --> Revoke
+Decide ..> AdminAuth : <<include>>
+Decide ..> Register : <<include>>
+Revoke ..> AdminAuth : <<include>>
 Agent --> Ingest
-Ingest ..> Auth : <<include>>
-Ingest ..> Store : <<include>>
-Ingest ..> Heart : <<include>>
+Ingest ..> Authenticate : <<include>>
+Ingest ..> Persist : <<include>>
 Scheduler --> Probe
-Endpoint -- Probe
-Probe ..> Result : <<include>>
+note bottom of Ingest
+ Token is unrelated to Supabase operator JWT.
+ Invalid/revoked token never updates heartbeat.
+end note
 @enduml

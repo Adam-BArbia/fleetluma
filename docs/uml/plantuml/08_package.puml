@@ -1,32 +1,48 @@
 @startuml 08_package
-package agent {
-  class Collector
-  class Reporter
+title FleetLuma v0.1.0 cloud package boundaries
+package "agent_core" {
+ class Collector
+ class Reporter
+ class PairingClient
+ class ProtectedCredentialStore
+ class ServiceLifecycle
 }
-package coordinator {
-  package api {
-    class AgentRoutes
-    class MonitoringRoutes
-  }
-  package domain {
-    class HostPolicy
-    class ServicePolicy
-  }
-  package persistence {
-    class Repository
-  }
-  package worker {
-    class Checker
-  }
+package "agent_setup_desktop" {
+ class SetupUi
+ class ProtectedLocalIPC
 }
-package mobile {
-  class Views
-  class ApiClient
+package "cloud_api" {
+ class PairingRoutes
+ class OperatorRoutes
+ class MonitoringRoutes
+ class WorkspaceAuthorization
+ class AgentCredentialVerifier
+ class PostgresStore
 }
-Reporter ..> AgentRoutes
-MonitoringRoutes ..> Repository
-AgentRoutes ..> Repository
-Checker ..> Repository
-Views ..> ApiClient
-ApiClient ..> MonitoringRoutes
+package "supabase" {
+ class PrivateWorkspaceSchema
+ class SupabaseAuth
+ class ExternalCheckScheduler
+}
+package "flutter_clients" {
+ class FleetViews
+ class AddDeviceView
+ class AuthenticatedApiClient
+}
+SetupUi --> ProtectedLocalIPC
+ProtectedLocalIPC --> PairingClient
+ServiceLifecycle --> Reporter
+Reporter ..> MonitoringRoutes
+PairingClient ..> PairingRoutes
+FleetViews --> AuthenticatedApiClient
+AddDeviceView --> AuthenticatedApiClient
+AuthenticatedApiClient ..> OperatorRoutes
+AuthenticatedApiClient ..> MonitoringRoutes
+PairingRoutes --> PostgresStore
+OperatorRoutes --> WorkspaceAuthorization
+MonitoringRoutes --> WorkspaceAuthorization
+MonitoringRoutes --> AgentCredentialVerifier
+WorkspaceAuthorization --> SupabaseAuth
+PostgresStore --> PrivateWorkspaceSchema
+ExternalCheckScheduler --> PrivateWorkspaceSchema
 @enduml

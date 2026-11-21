@@ -1,63 +1,37 @@
-# FleetLuma API contract — FL-6
+# FleetLuma API — v0.1.0 target contract
 
-**Status:** Versioned contract proposal for Sprint 1, implementation not yet started. **Canonical machine-readable source:** [openapi.json](./openapi.json).
+**Status:** Existing cloud monitoring endpoints are deployed; **pairing, workspace authorization, revocation and device management are contract-only until implemented.** [OpenAPI 3.1](./openapi.json) is the machine-readable source; [FL-31 architecture](../architecture/FL-31_PLUG_AND_PLAY_ENROLLMENT_V1.md) is the pairing decision record.
 
-## Responsibilities
+## Principal boundaries
 
-- **Agent** uses Python/psutil on Linux and Windows and **pushes** a single JSON report to the coordinator. Agent identity is derived from its provisioned bearer token; never accept a host id from the request body.
-- **FastAPI coordinator** validates and persists report + heartbeat as one logical transaction, computes host freshness, checks allowlisted HTTP services on an independent scheduler, exposes read-only routes to Flutter.
-- **Flutter Android** consumes JSON with 5-second polling. Null metrics, no samples, and stale state are legitimate. Do not fabricate data when disconnected.
-
-## Endpoint summary
-
-| Verb | Path | Purpose |
+| Principal | Proof | Scope |
 | --- | --- | --- |
-| POST | `/api/v1/agent/reports` | Authenticated agent CPU/RAM/disk with optional top-process list; returns **202** |
-| GET | `/api/v1/hosts` | List hosts with most recent resource metrics and status |
-| GET | `/api/v1/hosts/{id}` | Host detail with latest metrics |
-| GET | `/api/v1/hosts/{id}/history?window=15m\|1h\|24h` | Historical resource series |
-| GET | `/api/v1/hosts/{id}/processes` | Latest top ten processes, read-only |
-| GET | `/api/v1/services` | Allowlisted monitored HTTP services (possibly independent of host) |
-| GET | `/api/v1/services/{id}/checks?window=15m\|1h\|24h` | Recent HTTP health results |
+| Agent before enrollment | 256-bit private device polling secret; visible code is **not** authentication | Create, poll, cancel only its own pending pairing |
+| Paired Windows/Linux agent | Per-host locally held reporting token | Submit metrics for its ACTIVE registered host only |
+| Approved Supabase Auth operator | Valid RS256/ES256 JWT, role and workspace membership | Workspace-scoped monitoring reads |
+| Workspace owner/admin | JWT plus owner/admin membership | Pairing approval, device rename/revoke, audit |
+| Viewer | JWT plus viewer membership | Read-only workspace fleet; no approval or revocation |
 
-Full object fields, types, required properties, error responses and REST security are defined in OpenAPI 3.1 and illustrated under [examples](./examples).
+`POST /api/v1/agent/reports` stays compatible at the wire level but must reject **REVOKED** credentials with 401 and never mutate heartbeat on auth failure. `GET /api/v1/hosts` and `GET /api/v1/services` require `workspace_id` in the **target** contract (the current running API does not yet accept that query). Host detail/history/process paths enforce workspace membership via the host record. Services independent of a host still belong to a workspace through a new `services.workspace_id` relationship in the future additive migration.
 
-## State and timestamp invariants
+## Endpoint groups
 
-- `PENDING`: provisioned agent has never successfully reported.
-- `CONNECTED`: valid report received within the configured freshness window.
-- `STALE`: last accepted report is older than the freshness threshold; **not** proof a physical host is powered off.
-- `UNKNOWN`: HTTP service has no completed check yet.
-- `HEALTHY` / `UNHEALTHY`: independent central HTTP check result.
-- Backend `received_at` and `last_seen_at` are server-clock UTC instants. Agent `sampled_at` records sample time; client must not use it to infer heartbeat freshness.
-- Metrics are bounded 0–100%, except process CPU percentage may exceed 100 on multicore systems. RAM/disk bytes are nonnegative and `used <= total`.
-- Processes are read-only and capped at ten; their command lines and environment are never collected.
-- Latest process snapshot may be absent (null time + empty list).
-- History queries return ascending time series; store at most 24 hours for MVP.
-- Retried agent reports may cause duplicate samples; implementation should document retry behavior rather than claiming deduplication.
+**Existing monitoring routes (7):** `POST /api/v1/agent/reports`, `GET /api/v1/hosts`, `GET /api/v1/hosts/{id}`, `GET /api/v1/hosts/{id}/history`, `GET /api/v1/hosts/{id}/processes`, `GET /api/v1/services`, `GET /api/v1/services/{id}/checks`.
 
-## Validation and error rules
+**Design-only pairing and device management (11):** `POST /api/v1/agent/pairings`, `POST /api/v1/agent/pairings/token`, `POST /api/v1/agent/pairings/cancel`, `POST /api/v1/operator/pairings/resolve`, `POST /api/v1/operator/pairings/{id}/approve`, `POST /api/v1/operator/pairings/{id}/deny`, `GET /api/v1/operator/workspaces`, `GET /api/v1/operator/hosts`, `PATCH /api/v1/operator/hosts/{id}`, `POST /api/v1/operator/hosts/{id}/revoke`, `GET /api/v1/operator/device-audit`.
 
-- Agent sends `Authorization: Bearer <provisioned token>`; invalid/missing token → **401**; malformed schema → **422**; all failures must leave `last_seen_at` unchanged.
-- Unknown host/service ID → **404**; invalid window/time filter → **422**.
-- Error body: `{"error":{"code":"SOME_CODE","message":"Human-readable text"}}`.
-- Monitoring routes are **unauthenticated in the controlled LAN prototype**. This is an explicit MVP limitation, not a recommendation for production. Use HTTPS and operator authentication before exposing a coordinator to an untrusted network.
-- HTTP service target registration is administrator-configured/out-of-band; do not provide an unrestricted user-supplied URL fetch endpoint (SSRF risk).
+Short code: server-generated 8 symbols (4-4) using the defined non-confusable alphabet, 10-minute TTL, single-use and rate-limited. Agent polling secret is separate from its future report token. Polling uses JSON body, never URI query, and enforces >=5s server-side. No durable reporting secret is returned in any pairing response.
 
-## Open questions / defaults
+On `/agent/pairings/token`, `200 { "status": "pending" }` signifies continued wait; after approval, `200 { "status": "paired", "host_id": "...", "workspace_id": "..." }` confirms approval. Attempts before the polling interval return 429; denied is 403; expired is 410. Operator approval is atomic and must check membership in the selected workspace. Redacted 401/403/404 errors never leak tokens or code existence to unauthorized callers.
 
-Provisional: 10 s agent reports, 20 s service probes, 30 s process snapshots, 35 s stale threshold and 2xx–3xx health policy. Five-second Flutter polling, 24-hour history, two physical hosts and no cloud deployment are approved. HTTP probe policy, payload evolution, retention maintenance and agent provisioning format may be refined in implementation with synchronized contract updates.
+The `Host` response **target** requires `workspace_id`, `lifecycle`, and a reporting status in `PENDING|CONNECTED|STALE|REVOKED`; old runtime payloads and examples were different. `REVOKED` supersedes heartbeat-derived states; `STALE` is never proof the machine is off.
 
-## Build order and entrypoints
+## Validation
 
-1. Update the OpenAPI document and all JSON examples first (FL-6).
-2. Agent owner (FL-7) implements `AgentReport` against `POST /api/v1/agent/reports`.
-3. Backend owner (FL-8) implements token validation, transactions and GET routes.
-4. Flutter owner (FL-9) reads `HostList` and other response schemas; Android emulator must use a reachable coordinator endpoint rather than blindly using its own `127.0.0.1`.
-5. Integration owners validate local LAN connectivity and failure behavior (FL-13).
+CI runs `python docs/api/validate_contract.py` to validate OpenAPI, the complete 18-operation method/path inventory, operator-route JWT schemes and 12 JSON examples. All new examples are synthetic, not live device identifiers. This is specification validation, **not proof of implemented pairing endpoints**.
 
-## Non-implementation scaffold
+## Scope
 
-`agent/`, `backend/`, `mobile/` are separate planned deployable roots. No runnable app skeleton, package files, or secrets are introduced by FL-6. See each directory README and example config. This does **not** indicate features are implemented.
+Windows and Ubuntu/Debian packages, background agents with local setup UIs and dashboard approval are mandatory before v0.1.0 is released. Existing TUFFEST host and metrics must survive the additive database migration. Original local-LAN unauthenticated behavior remains a development/demo-only path, never the cloud release model.
 
-**Acceptance evidence:** OpenAPI JSON parse + reference check + sample shape check in this task, reviewable Jira-linked GitHub PR. Real FastAPI/Flutter/psutil integration tests belong to subsequent issues.
+Service checking/retention is a separately gated FL-19 concern. Do not implement arbitrary user-defined URL probes without SSRF protections and scheduler review.

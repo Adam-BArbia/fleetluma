@@ -1,17 +1,34 @@
 @startuml 11_activity_agent
+title Agent operation after plug-and-play installation
 start
-:Read configured host ID and token;
-:Sample CPU/RAM/disk;
-if (Process sampling due?) then (yes)
- :Collect top 10 processes;
+:Start Windows service / Linux systemd daemon;
+:Load protected local credentials;
+if (Valid paired credential?) then (no)
+ :Wait for user-initiated pairing via setup UI;
+ :Request short-lived code; poll approval;
+ if (Approved and credential bound?) then (yes)
+  :Persist host ID and continue;
+ else (no)
+  :Stay unpaired (no metrics transmitted);
+  stop
+ endif
 endif
-:Compose report;
-:POST report to coordinator;
-if (HTTP accepted?) then (yes)
- :Schedule next sample;
-else (no)
- :Record local error;
- :Apply bounded retry/backoff;
-endif
+repeat
+ :Collect CPU/RAM/disk;
+ if (Process sampling due?) then (yes)
+  :Collect top 10 processes;
+ endif
+ :POST HTTPS report using local token;
+ if (HTTP 202 accepted?) then (yes)
+  :Update local success status;
+ else (no)
+  if (Unauthorized/revoked?) then (yes)
+   :Stop reporting; show NEEDS_REPAIR;
+   stop
+  else (no)
+   :Apply bounded backoff without leaking token;
+  endif
+ endif
+repeat while (Service running?) is (yes)
 stop
 @enduml

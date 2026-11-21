@@ -1,26 +1,37 @@
 @startuml 10_object_snapshot
-object "hostA : Host" as h {
-  id = A
-  state = CONNECTED
+title Target workspace-scoped monitoring snapshot (synthetic)
+object "workspace : Workspace" as ws {
+ name = Personal Fleet
+}
+object "owner : WorkspaceMembership" as own {
+ role = OWNER
+}
+object "hostA : Host" as a {
+ name = TUFFEST
+ lifecycle = ACTIVE
+ status = CONNECTED
 }
 object "hostB : Host" as b {
-  id = B
-  state = STALE
+ lifecycle = ACTIVE
+ status = STALE
+}
+object "hostC : Host" as c {
+ lifecycle = REVOKED
+ status = REVOKED
 }
 object "website : MonitoredService" as w {
-  hostId = A
-  name = Demo API
-}
-object "check : ServiceCheck" as c {
-  result = UNHEALTHY
-  httpStatus = 503
+ enabled = true
+ status = UNHEALTHY
 }
 object "sample : MetricSample" as s {
-  cpuPct = 42
-  ramPct = 68
+ cpuPct = 42
 }
-h -- w
-w -- c
-h -- s
-note right of w : An HTTP service can fail while its host agent reports normally.
+ws -- own
+ws -- a
+ws -- b
+ws -- c
+ws -- w
+a -- s
+note right of w : Service status independent of agent freshness.
+note bottom of c : REVOKED supersedes heartbeat-derived state.
 @enduml

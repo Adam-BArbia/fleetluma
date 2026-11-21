@@ -1,23 +1,27 @@
 @startuml 23_seq_host_detail
+title Workspace-scoped host investigations
 actor Operator
-participant Flutter as UI
-participant FastAPI as API
-database SQLite as DB
+participant "Flutter host detail" as UI
+participant "FastAPI" as API
+database "Private PostgreSQL" as DB
 Operator -> UI : Select host
-par Host details
- UI -> API : GET /hosts/{id}
- API -> DB : current host + sample
- DB --> API : data
- API --> UI : host detail
-else History series
- UI -> API : GET /hosts/{id}/history?window=1h
- API -> DB : select bounded time range
- DB --> API : samples
- API --> UI : chart points
-else Top processes
- UI -> API : GET /hosts/{id}/processes
- API -> DB : latest snapshot
- DB --> API : up to 10 entries
- API --> UI : processes
+UI -> API : GET /api/v1/hosts/{id}\nBearer operator JWT
+API -> DB : Check workspace membership + host ownership
+alt not authorized
+ API --> UI : 403 Forbidden / 404 opaque
+else allowed
+ DB --> API : authorized host
+ API --> UI : Host detail
+ par History
+  UI -> API : GET /api/v1/hosts/{id}/history?window=1h
+  API -> DB : Membership + 24h bounded metrics
+  DB --> API : samples
+  API --> UI : chart points
+ else Process snapshot
+  UI -> API : GET /api/v1/hosts/{id}/processes
+  API -> DB : Membership + latest snapshot
+  DB --> API : up to ten entries
+  API --> UI : processes
+ end
 end
 @enduml

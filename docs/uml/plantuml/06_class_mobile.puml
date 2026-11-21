@@ -1,37 +1,64 @@
 @startuml 06_class_mobile
+title Flutter Web and Android client - v0.1.0 target
+class AuthGate {
+ +signIn()
+ +checkOperatorAuthorization()
+ +signOut()
+}
 class FleetScreen {
-  +renderHosts()
+ +renderWorkspaceHosts()
 }
 class HostDetailScreen {
-  +renderMetricHistory()
+ +renderMetricHistory()
 }
 class ProcessesScreen {
-  +renderTopTen()
+ +renderTopTen()
 }
 class ServicesScreen {
-  +renderServiceChecks()
+ +renderServiceChecks()
+}
+class AddDeviceScreen {
+ +enterUserCode()
+ +resolveSafeMetadata()
+ +chooseWorkspace()
+ +approveOrDeny()
+}
+class DeviceManagementScreen {
+ +listDevices()
+ +rename()
+ +revoke()
 }
 class MonitoringApiClient {
-  +getHosts()
-  +getHistory(id)
-  +getProcesses(id)
-  +getServices()
+ +getWorkspaceHosts()
+ +getHistory(id)
+ +getProcesses(id)
+ +getServices()
+}
+class EnrollmentApiClient {
+ +resolveCode(code)
+ +approvePairing(id, workspaceId)
+ +denyPairing(id)
+ +getManagedHosts(workspaceId)
+ +revokeHost(id)
 }
 class FleetViewModel {
-  +load()
-  +refresh()
+ +refresh()
 }
-class HostViewModel {
-  +load(id)
+class DeviceViewModel {
+ +requestApproval()
+ +manageDevices()
 }
-class ServiceViewModel {
-  +load()
-}
+AuthGate --> FleetScreen : only after approved JWT
 FleetScreen --> FleetViewModel
-HostDetailScreen --> HostViewModel
-ProcessesScreen --> HostViewModel
-ServicesScreen --> ServiceViewModel
+HostDetailScreen --> MonitoringApiClient
+ProcessesScreen --> MonitoringApiClient
+ServicesScreen --> MonitoringApiClient
+AddDeviceScreen --> DeviceViewModel
+DeviceManagementScreen --> DeviceViewModel
+DeviceViewModel --> EnrollmentApiClient
 FleetViewModel --> MonitoringApiClient
-HostViewModel --> MonitoringApiClient
-ServiceViewModel --> MonitoringApiClient
+note bottom
+ Add-device UI is future implementation, not shipped.
+ JWT user session alone is not workspace authorization.
+end note
 @enduml

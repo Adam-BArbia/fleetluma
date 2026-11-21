@@ -1,11 +1,22 @@
 @startuml 18_state_mobile
-[*] --> LOADING
-LOADING --> READY : API data received
-LOADING --> EMPTY : API returns no registered hosts
-LOADING --> ERROR : timeout / API failure
-READY --> REFRESHING : 5s poll
-REFRESHING --> READY : updated data
-REFRESHING --> ERROR : failed fetch
-ERROR --> LOADING : retry
-EMPTY --> LOADING : refresh
+title Flutter dashboard auth, fleet, and pairing states
+[*] --> SIGNED_OUT
+SIGNED_OUT --> VALIDATING : Supabase sign-in
+VALIDATING --> DENIED : JWT rejected / not approved
+VALIDATING --> READY : approved JWT and workspace membership
+DENIED --> SIGNED_OUT : sign out
+READY --> REFRESHING : periodic 5s fleet refresh
+REFRESHING --> READY : authorized updated data
+REFRESHING --> ERROR : timeout / denied
+ERROR --> READY : successful retry
+READY --> PAIRING_LOOKUP : Add device / enter code
+PAIRING_LOOKUP --> PAIRING_REVIEW : valid pending code and authorized role
+PAIRING_LOOKUP --> READY : unknown / expired / rate-limited
+PAIRING_REVIEW --> PAIRING_APPROVING : explicit approval
+PAIRING_REVIEW --> READY : deny / cancel
+PAIRING_APPROVING --> READY : server confirmation
+PAIRING_APPROVING --> ERROR : failure
+READY --> DEVICE_MANAGEMENT : open devices
+DEVICE_MANAGEMENT --> READY : close
+READY --> SIGNED_OUT : sign out
 @enduml

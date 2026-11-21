@@ -1,14 +1,15 @@
 @startuml 21_seq_rejected_report
-actor Agent
-participant API
-participant Auth
-participant Database as DB
-Agent -> API : POST metrics + invalid token
-API -> Auth : authenticate(token)
-Auth --> API : failure
-API --> Agent : 401 Unauthorized
-note right of DB: No samples, host registration or heartbeat update.
-Agent -> API : POST malformed payload + valid token
-API -> API : schema validation fails
-API --> Agent : 422 Unprocessable Entity
+title Rejected agent report - security invariants
+actor "Agent or attacker" as Agent
+participant "FastAPI" as API
+database "Private PostgreSQL" as DB
+Agent -> API : POST report + invalid/revoked token
+API -> DB : Lookup ACTIVE host by token hash
+DB --> API : Not found or lifecycle REVOKED
+API --> Agent : HTTP 401 Unauthorized
+note right of DB : No sample, process or heartbeat mutation.
+Agent -> API : POST malformed report + valid ACTIVE token
+API -> API : Payload schema validation fails
+API --> Agent : HTTP 422 Invalid Request
+note over API,DB : Never log raw tokens or pairing secrets.
 @enduml

@@ -1,19 +1,36 @@
 @startuml 01_use_cases_operator
 left to right direction
-actor Operator
-rectangle "FleetLuma mobile monitoring" {
- usecase "View fleet overview" as Fleet
- usecase "Inspect host metrics" as Host
- usecase "View historical graphs" as Graph
- usecase "Inspect top processes" as Proc
- usecase "Inspect HTTP service health" as Service
+actor "Approved operator" as Operator
+actor "Workspace owner/admin" as Admin
+actor "Workspace viewer" as Viewer
+Admin --|> Operator
+Viewer --|> Operator
+rectangle "FleetLuma cloud dashboard (v0.1.0 target)" {
+ usecase "Sign in (Supabase Auth)" as Login
+ usecase "View workspace fleet" as Fleet
+ usecase "Inspect host metrics/history/processes" as Inspect
  usecase "See latest report age" as Age
+ usecase "Add device by pairing code" as Pair
+ usecase "Review pairing metadata" as Review
+ usecase "Approve/deny device" as Decide
+ usecase "Rename/revoke device" as Manage
+ usecase "Review device audit" as Audit
+ usecase "Inspect HTTP service health (future FL-19)" as Service
 }
+Operator --> Login
 Operator --> Fleet
-Operator --> Host
-Operator --> Graph
-Operator --> Proc
+Operator --> Inspect
 Operator --> Service
+Admin --> Pair
+Admin --> Decide
+Admin --> Manage
+Admin --> Audit
+Pair ..> Review : <<include>>
+Decide ..> Review : <<include>>
 Fleet ..> Age : <<include>>
-Host ..> Age : <<include>>
+Inspect ..> Age : <<include>>
+note right of Login
+ Sign-in alone never grants fleet access.
+ API checks approved JWT and workspace membership.
+end note
 @enduml

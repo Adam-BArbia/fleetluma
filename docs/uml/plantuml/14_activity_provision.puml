@@ -1,14 +1,31 @@
 @startuml 14_activity_provision
+title Plug-and-play pairing (replaces manual CLI for end users)
 start
-:Operator selects host identifier;
-:Generate unique agent token out of band;
-:Store token hash in coordinator;
-:Configure agent URL, ID, and secret locally;
-:Start installed agent;
-if (Authenticated report accepted?) then (yes)
- :Show host CONNECTED;
+:Install agent package; service starts without a reporting credential;
+:Open local setup UI; accept data-collection notice;
+:User selects Connect this device;
+:Agent generates and stores strong reporting secret;
+:POST pairing request with precommitted secret hash;
+:API creates 10-minute code + private polling session;
+:Show code in setup UI;
+:Operator signs into Flutter Web;
+:Operator enters pairing code;
+:API verifies TTL, rate limits, JWT and workspace membership;
+if (Authorized admin explicitly approves?) then (yes)
+ :Atomically register workspace host and credential digest;
+ :Agent polls with independent private session secret;
+ if (Approval retrieved?) then (yes)
+  :Persist host ID; start HTTPS monitoring;
+  :First accepted sample establishes CONNECTED;
+ else (no)
+  :Retry safely or show expiration;
+ endif
 else (no)
- :Troubleshoot network/token without exposing secret;
+ :Deny or expire pairing, never register host;
 endif
 stop
+note right
+ Pairing code never authenticates monitoring.
+ Dashboard never handles long-lived agent credential.
+end note
 @enduml

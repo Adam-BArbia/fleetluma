@@ -1,16 +1,21 @@
 @startuml 20_seq_agent_report
-actor "Agent" as Agent
-participant "FastAPI /reports" as API
-participant "Token validator" as Auth
-participant "Metrics repository" as DB
-participant "Host registry" as Host
-Agent -> API : POST report + bearer token
-API -> Auth : resolve host(token)
-Auth --> API : host identity
-API -> API : validate sample and bounds
-API -> DB : save metric and process snapshot
-DB --> API : committed
-API -> Host : update lastSeenAt(receive time)
-Host --> API : saved
-API --> Agent : 202 Accepted
+title HTTPS report with active credential only
+actor "Paired agent" as Agent
+participant "FastAPI /agent/reports" as API
+database "Private PostgreSQL" as DB
+Agent -> API : POST report + locally held bearer token
+API -> DB : Match SHA-256 credential hash\nAND host lifecycle=ACTIVE
+DB --> API : authorized host ID or none
+alt no valid active credential
+ API --> Agent : 401 Unauthorized
+else ACTIVE host
+ API -> API : Validate bounded payload
+ API -> DB : Transaction: sample + process snapshot\n+ server-received heartbeat
+ DB --> API : committed received_at
+ API --> Agent : 202 Accepted + host_id
+end
+note right of DB
+ Invalid/revoked token never inserts a sample
+ or refreshes a heartbeat.
+end note
 @enduml
