@@ -104,8 +104,8 @@ begin
     if not HasExistingService() then
     begin
       BinaryPath := ExpandConstant('{app}\Agent\FleetLumaAgent.exe');
-      ScCommand('create FleetLumaAgent binPath= \"' + BinaryPath +
-                '\" start= auto obj= LocalSystem DisplayName= "FleetLuma Monitoring Agent"');
+      ScCommand('create FleetLumaAgent binPath= "\"' + BinaryPath +
+                '\"" start= auto obj= LocalSystem DisplayName= "FleetLuma Monitoring Agent"');
     end;
     // Enable the dedicated service SID used by the protected pipe ACL.
     ScCommand('sidtype FleetLumaAgent unrestricted');
