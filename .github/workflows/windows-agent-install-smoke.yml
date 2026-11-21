@@ -73,6 +73,10 @@ jobs:
               Select-Object TimeCreated,ProviderName,Message | Format-List | Out-String -Width 180 | Write-Output
             throw "FleetLumaAgent is not running after install"
           }
+          $pathName = (Get-CimInstance Win32_Service -Filter "Name='FleetLumaAgent'").PathName
+          if (!$pathName.StartsWith('"')) {
+            throw "The service binary path is not quoted. Refuse unquoted service paths."
+          }
           $sid = & sc.exe qsidtype FleetLumaAgent | Out-String
           if ($sid -notmatch "UNRESTRICTED") { throw "Service SID was not enabled" }
           if (!(Test-Path "${env:ProgramData}\FleetLuma\private")) { throw "Credential directory missing" }
