@@ -1,0 +1,11 @@
+Package: fleetluma-agent
+Version: 0.1.0~rc1
+Section: admin
+Priority: optional
+Architecture: amd64
+Maintainer: FleetLuma Developers <noreply@github.com>
+Depends: systemd
+Description: FleetLuma host metric monitoring agent (developer candidate)
+ FleetLuma reports CPU, RAM, disk and process metrics to the authorized
+ FleetLuma HTTPS coordinator after explicit dashboard device pairing.
+ This candidate must undergo clean-machine end-to-end acceptance before release.
