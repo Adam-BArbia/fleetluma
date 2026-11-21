@@ -74,6 +74,16 @@ void main() {
     expect(find.text('LAST KNOWN READINGS · NOT LIVE'), findsOneWidget);
   });
 
+  testWidgets('revoked host is marked revoked, never live', (tester) async {
+    final api = FakeFleetApi()..response = [host(status: AgentStatus.revoked)];
+    final controller = FleetController(api: api);
+    await tester.pumpWidget(app(controller));
+    await tester.pumpAndSettle();
+    expect(find.text('REVOKED'), findsOneWidget);
+    expect(find.text('REVOKED · HISTORICAL READINGS'), findsOneWidget);
+    expect(find.text('CONNECTED'), findsNothing);
+  });
+
   testWidgets('API failure shows retry and readable error', (tester) async {
     final api = FakeFleetApi()
       ..exception = const FleetConnectionException('Coordinator unreachable');
