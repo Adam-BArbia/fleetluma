@@ -71,6 +71,17 @@ def main():
     if sys.platform != "win32":
         raise RuntimeError("Windows SCM wrapper must run on Windows")
     import win32serviceutil
+    if sys.argv[1:] == ["--self-test"]:
+        # Exercises the same native imports from inside the frozen binary.
+        # Does not install, start, or connect to any service.
+        from .windows_control import private_pipe_attributes
+        from .secure_state import ProtectedCredentialStore
+        from .service_runtime import EnrollmentController
+        assert callable(private_pipe_attributes)
+        assert ProtectedCredentialStore is not None
+        assert EnrollmentController is not None
+        print("FleetLuma Windows service imports OK")
+        return
     if getattr(sys, "frozen", False):
         # This binary is dedicated to the SCM. Always dispatch when frozen;
         # Windows SCM may supply arguments that must not trigger CLI handling.
