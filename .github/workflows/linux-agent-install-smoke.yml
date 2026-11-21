@@ -21,7 +21,7 @@ jobs:
         run: |
           python -m pip install -r agent/requirements.txt
           python -m pip install "pyinstaller==6.16.0"
-          python -m unittest discover -s agent/tests -v
+          (cd agent && python -m unittest discover -s tests -v)
           sh agent/packaging/linux/build_deb.sh
       - name: Install on disposable Ubuntu runner
         run: |
