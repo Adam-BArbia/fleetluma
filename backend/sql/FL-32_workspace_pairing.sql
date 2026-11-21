@@ -80,6 +80,51 @@ CREATE TABLE IF NOT EXISTS fleetluma.pairing_sessions (
   display_name text NOT NULL CHECK(char_length(display_name) BETWEEN 1 AND 64),
   platform text NOT NULL CHECK(platform IN('windows','linux')),
   agent_version text NOT NULL CHECK(char_length(agent_version) BETWEEN 1 AND 64),
+  client_key_hash text NOT NULL CHECK(client_key_hash ~ '^[a-f0-9]{64}
+  capabilities jsonb NOT NULL DEFAULT '[]'::jsonb CHECK(jsonb_typeof(capabilities)='array'),
+  status text NOT NULL DEFAULT 'PENDING' CHECK(status IN('PENDING','APPROVED','CONSUMED','DENIED','EXPIRED','CANCELLED')),
+  expires_at timestamptz NOT NULL,
+  attempts int NOT NULL DEFAULT 0 CHECK(attempts >= 0 AND attempts <= 1000),
+  next_poll_at timestamptz,
+  approved_by uuid REFERENCES auth.users(id),
+  workspace_id uuid REFERENCES fleetluma.workspaces(id),
+  host_id uuid REFERENCES fleetluma.hosts(id),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  approved_at timestamptz,
+  consumed_at timestamptz,
+  CHECK(expires_at > created_at),
+  CHECK(status NOT IN('APPROVED','CONSUMED') OR
+    (approved_by IS NOT NULL AND workspace_id IS NOT NULL AND host_id IS NOT NULL))
+);
+CREATE INDEX IF NOT EXISTS idx_fl_pairing_expiry ON fleetluma.pairing_sessions(expires_at);
+CREATE INDEX IF NOT EXISTS idx_fl_pairing_state ON fleetluma.pairing_sessions(status,created_at);
+CREATE INDEX IF NOT EXISTS idx_fl_pairing_client_window ON fleetluma.pairing_sessions(client_key_hash,created_at DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_fl_pairing_host_consumed
+ ON fleetluma.pairing_sessions(host_id) WHERE status IN('APPROVED','CONSUMED');
+
+CREATE TABLE IF NOT EXISTS fleetluma.device_audit_events (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  host_id uuid REFERENCES fleetluma.hosts(id),
+  pairing_id uuid REFERENCES fleetluma.pairing_sessions(id),
+  workspace_id uuid REFERENCES fleetluma.workspaces(id),
+  actor_user_id uuid REFERENCES auth.users(id),
+  action text NOT NULL CHECK(char_length(action) BETWEEN 1 AND 60),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  details jsonb NOT NULL DEFAULT '{}'::jsonb CHECK(jsonb_typeof(details)='object')
+);
+CREATE INDEX IF NOT EXISTS idx_fl_audit_workspace_time
+  ON fleetluma.device_audit_events(workspace_id,created_at DESC);
+
+-- Private schema remains invisible to browser-facing PostgREST roles.
+ALTER TABLE fleetluma.workspaces ENABLE ROW LEVEL SECURITY;
+ALTER TABLE fleetluma.workspace_memberships ENABLE ROW LEVEL SECURITY;
+ALTER TABLE fleetluma.pairing_sessions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE fleetluma.device_audit_events ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON ALL TABLES IN SCHEMA fleetluma FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON ALL SEQUENCES IN SCHEMA fleetluma FROM PUBLIC, anon, authenticated;
+
+COMMIT;
+),
   capabilities jsonb NOT NULL DEFAULT '[]'::jsonb CHECK(jsonb_typeof(capabilities)='array'),
   status text NOT NULL DEFAULT 'PENDING' CHECK(status IN('PENDING','APPROVED','CONSUMED','DENIED','EXPIRED','CANCELLED')),
   expires_at timestamptz NOT NULL,
