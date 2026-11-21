@@ -1,36 +1,46 @@
 @startuml 30_cloud_deployment
-title FleetLuma - Proposed Cloud Deployment (design, not deployed)
+title FleetLuma - final cloud topology with v0.1.0 pairing (DESIGN TARGET)
 skinparam componentStyle rectangle
-node "Operators" {
-  component "Flutter Web\nVercel Static" as Web
-  component "Flutter Android" as Android
+node "Authorized operators" {
+ component "Flutter Web (Vercel static)" as Web
+ component "Flutter Android" as Android
+}
+node "Windows monitored host" {
+ artifact "Agent setup UI (Flutter desktop)" as WindowsUI
+ component "Python psutil Windows service" as WindowsAgent
+}
+node "Ubuntu/Debian monitored host" {
+ artifact "Agent setup UI (Flutter Linux / CLI headless)" as LinuxUI
+ component "Python psutil systemd daemon" as LinuxAgent
 }
 cloud "Vercel FleetLuma team" {
-  component "FastAPI Python Functions\nHTTPS / REST" as API
+ component "FastAPI Python Functions\nEnrollment + reporting + device management" as API
 }
 node "Supabase FleetLuma" {
-  database "PostgreSQL\nprivate fleetluma schema" as PG
-  component "Supabase Auth\nJWT issuer" as Auth
-  component "Scheduled HTTP checker\nEdge Function / Cron" as Scheduler
+ database "PostgreSQL private fleetluma schema\nworkspaces, memberships, pairings, hosts, samples, audit" as PG
+ component "Supabase Auth\noperator JWT issuer" as Auth
+ component "Scheduled HTTP checker\nEdge Function / Cron (FL-19)" as Scheduler
 }
-node "Real host A" {
-  component "psutil Agent A" as AgentA
-}
-node "Real host B" {
-  component "psutil Agent B" as AgentB
-}
-cloud "Allowlisted public\nHTTP endpoints" as Endpoints
-Web --> API : HTTPS authenticated GET
-Android --> API : HTTPS authenticated GET
-AgentA --> API : HTTPS authenticated POST
-AgentB --> API : HTTPS authenticated POST
-API --> Auth : validate operator token
-API --> PG : pooled TLS SQL
-Scheduler --> Endpoints : bounded HTTP probe
+cloud "Allowlisted public HTTP endpoints" as Endpoints
+WindowsUI --> WindowsAgent : protected local named pipe
+LinuxUI --> LinuxAgent : restricted UNIX socket
+WindowsAgent --> API : HTTPS pairing and reporting
+LinuxAgent --> API : HTTPS pairing and reporting
+Web --> API : HTTPS approved JWT, scoped fleet + device approval
+Android --> API : HTTPS approved JWT, scoped fleet + device approval
+Web --> Auth : operator login
+Android --> Auth : operator login
+API --> Auth : validate JWKS, issuer, audience
+API --> PG : pooled private TLS SQL transactions
+Scheduler --> Endpoints : approved bounded HTTP probes
 Scheduler --> PG : checks and retention
 note bottom of API
-  No SQLite in cloud
-  No in-process scheduled checker
-  API contract remains 7 routes
+ No SQLite in cloud, no background scheduler
+ No Vercel SSO challenge at agent API (machine traffic)
+ Pairing code display-only; reporting secret stays on agent
+end note
+note bottom of PG
+ Additive migration preserves existing TUFFEST and samples.
+ No direct browser/database exposure.
 end note
 @enduml
