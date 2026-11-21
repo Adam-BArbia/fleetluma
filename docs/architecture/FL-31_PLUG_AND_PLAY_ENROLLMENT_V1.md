@@ -91,7 +91,7 @@ Every table stays in the **private `fleetluma` schema**, with no `anon`/`authent
 
 All paths above are appended to `/api/v1` (except the existing health path). Use consistent JSON `error.code` values, request IDs, and `Cache-Control: no-store` for pairing responses. Never put short codes, device session secrets or reporting tokens in URLs, error bodies, logs, analytics or audit fields. Rate-limit even unknown codes with uniform responses; unauthorized lookup must not enumerate pending devices.
 
-**HTTP semantics:** unknown/invalid agent token `401`; expired pairing `410`; denied pairing `403`; premature polling `429` + Retry-After; already consumed request `409` unless idempotent same-device acknowledgement; unauthorized operator `401/403`. Use no shared browser credentials on device endpoints. Return client safe errors.
+**HTTP semantics:** unknown/invalid agent token `401`; expired pairing `410`; denied pairing `403`; premature polling `429` + Retry-After; already consumed request `409` unless idempotent same-device acknowledgement; unauthorized operator `401/403`. Use no shared browser credentials on device endpoints. Return client safe errors. Use HTTP 200 plus \`status: pending\` for ordinary permitted polls, not HTTP 202.
 
 ## 7. Security and anti-abuse controls
 
