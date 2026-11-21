@@ -12,12 +12,14 @@ class FleetScreen extends StatefulWidget {
   final FleetController controller;
   final String apiUrl;
   final Future<void> Function()? onSignOut;
+  final VoidCallback? onManageDevices;
 
   const FleetScreen({
     super.key,
     required this.controller,
     required this.apiUrl,
     this.onSignOut,
+    this.onManageDevices,
   });
 
   @override
@@ -63,6 +65,12 @@ class _FleetScreenState extends State<FleetScreen>
               Text('FleetLuma', style: TextStyle(fontWeight: FontWeight.w800)),
             ]),
             actions: [
+              if (widget.onManageDevices != null)
+                IconButton(
+                  tooltip: 'Manage devices',
+                  onPressed: widget.onManageDevices,
+                  icon: const Icon(Icons.devices_other_rounded),
+                ),
               if (widget.onSignOut != null)
                 IconButton(
                   tooltip: 'Sign out',
@@ -185,7 +193,9 @@ class _FleetScreenState extends State<FleetScreen>
             const SizedBox(height: 10),
             Text(
               state.errorMessage == null
-                  ? 'Provision a host token on the coordinator, then start the monitoring agent.'
+                  ? (widget.onManageDevices == null
+                      ? 'No monitoring agents are registered yet.'
+                      : 'Install FleetLuma Agent, then select Manage devices to pair it.')
                   : 'Verify the backend is reachable from this phone or emulator.',
               textAlign: TextAlign.center,
               style: const TextStyle(color: _subtle),
