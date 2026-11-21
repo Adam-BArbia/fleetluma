@@ -81,6 +81,7 @@ class ProcessEntry {
  +memoryBytes: Long
 }
 class MonitoredService {
+ +workspaceId: UUID
  +id: UUID
  +url: URL
  +enabled: Boolean
@@ -99,6 +100,7 @@ enum CheckResult {
 Workspace "1" -- "0..*" WorkspaceMembership
 WorkspaceMembership --> MembershipRole
 Workspace "1" -- "0..*" Host
+Workspace "1" -- "0..*" MonitoredService
 Workspace "0..1" -- "0..*" PairingSession
 PairingSession --> PairingState
 PairingSession "0..1" --> "0..1" Host : approved enrollment
