@@ -42,6 +42,9 @@ jobs:
           sudo /usr/bin/fleetluma-control status >/tmp/fleetluma-control-out.txt 2>/tmp/fleetluma-control-err.txt
           result=$?
           set -e
+          echo "Local helper exit code: $result"
+          cat /tmp/fleetluma-control-out.txt
+          cat /tmp/fleetluma-control-err.txt
           test "$result" -eq 2
           test ! -s /tmp/fleetluma-control-out.txt
           grep -F "FleetLuma local control is unavailable" /tmp/fleetluma-control-err.txt
