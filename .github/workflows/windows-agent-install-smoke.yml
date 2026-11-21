@@ -41,7 +41,11 @@ jobs:
         shell: pwsh
         run: |
           $installer = (Resolve-Path "dist/windows-installer/FleetLuma-Agent-Windows-UNSIGNED-CANDIDATE.exe").Path
-          $proc = Start-Process -FilePath $installer -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART","/SP-" -Wait -PassThru
+          $proc = Start-Process -FilePath $installer -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART","/SP-" -PassThru
+          if (!$proc.WaitForExit(120000)) {
+            Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
+            throw "Inno installer did not finish within bounded test duration"
+          }
           if ($proc.ExitCode -ne 0) { throw "Inno installer returned exit $($proc.ExitCode)" }
           for ($i = 0; $i -lt 30; $i++) {
             $service = Get-Service -Name FleetLumaAgent -ErrorAction SilentlyContinue
@@ -76,7 +80,11 @@ jobs:
         run: |
           $uninstaller = "${env:ProgramFiles}\FleetLuma\unins000.exe"
           if (!(Test-Path $uninstaller)) { throw "Expected uninstaller missing" }
-          $proc = Start-Process -FilePath $uninstaller -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART" -Wait -PassThru
+          $proc = Start-Process -FilePath $uninstaller -ArgumentList "/VERYSILENT","/SUPPRESSMSGBOXES","/NORESTART" -PassThru
+          if (!$proc.WaitForExit(120000)) {
+            Stop-Process -Id $proc.Id -Force -ErrorAction SilentlyContinue
+            throw "Inno uninstaller did not finish within bounded test duration"
+          }
           if ($proc.ExitCode -ne 0) { throw "Uninstaller returned exit $($proc.ExitCode)" }
           Start-Sleep -Seconds 2
           if (Get-Service -Name FleetLumaAgent -ErrorAction SilentlyContinue) {
