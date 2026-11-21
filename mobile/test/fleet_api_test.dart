@@ -94,4 +94,40 @@ void main() {
       throwsArgumentError,
     );
   });
+
+  test('Workspace-enforced fleet sends scope alongside approved JWT', () async {
+    late Uri observed;
+    final mock = MockClient((request) async {
+      observed = request.url;
+      expect(request.headers['Authorization'], 'Bearer approved-jwt');
+      return http.Response('{"items":[]}', 200);
+    });
+    final api = HttpFleetApi(
+      baseUrl: 'https://api.example.test',
+      client: mock,
+      tokenProvider: () async => 'approved-jwt',
+      workspaceIdProvider: () async => 'workspace-123',
+    );
+    expect(await api.fetchHosts(), isEmpty);
+    expect(observed.queryParameters['workspace_id'], 'workspace-123');
+    mock.close();
+  });
+
+  test('Workspace-enforced fleet refuses unscoped requests', () async {
+    var requests = 0;
+    final mock = MockClient((request) async {
+      requests++;
+      return http.Response('{"items":[]}', 200);
+    });
+    final api = HttpFleetApi(
+      baseUrl: 'https://api.example.test',
+      client: mock,
+      tokenProvider: () async => 'approved-jwt',
+      workspaceIdProvider: () async => null,
+    );
+    await expectLater(api.fetchHosts(), throwsA(isA<FleetAccessDeniedException>()));
+    expect(requests, 0);
+    mock.close();
+  });
+
 }
