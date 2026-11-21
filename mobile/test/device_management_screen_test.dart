@@ -74,6 +74,8 @@ void main() {
     expect(api.lastCode, 'ABCD-7294');
     expect(find.textContaining('Computer: TUFFEST'), findsOneWidget);
     expect(api.approveCalls, 0);
+    await tester.ensureVisible(find.text('Approve and connect'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Approve and connect'));
     await tester.pumpAndSettle();
     expect(api.approveCalls, 1);
