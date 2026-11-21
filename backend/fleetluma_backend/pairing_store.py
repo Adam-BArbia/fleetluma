@@ -45,6 +45,13 @@ class PairingStore(PostgresStore):
     def _subject(self, value: str) -> str:
         return code_digest_hash(self.pepper, value)
 
+    def _consume_limit(self, scope: str, digest: str, maximum: int):
+        # A rejection in the *business transaction* must never roll back a
+        # consumed attempt. Persist limit in a separate committed transaction.
+        with self._connect() as conn:
+            with conn.cursor() as cur:
+                self._limit(cur, scope, digest, maximum)
+
     @staticmethod
     def _limit(cur, scope: str, digest: str, maximum: int,
                window: timedelta = timedelta(minutes=10)):
@@ -89,9 +96,9 @@ class PairingStore(PostgresStore):
         validate_agent_metadata(hostname, platform, agent_version,
                                 report_token_sha256, capabilities)
         client_digest = self._subject("create:" + client_key)
+        self._consume_limit("create", client_digest, maximum=5)
         with self._connect() as conn:
             with conn.cursor() as cur:
-                self._limit(cur, "create", client_digest, maximum=5)
                 # Serialize global budget checks; no in-memory rate counters.
                 cur.execute("SELECT pg_advisory_xact_lock(5432101)")
                 cur.execute("""
@@ -197,9 +204,9 @@ class PairingStore(PostgresStore):
         except ValueError:
             # Still charge rate-limit budget for malformed codes.
             digest = None
+        self._consume_limit("resolve", self._subject("resolve:" + actor), 10)
         with self._connect() as conn:
             with conn.cursor() as cur:
-                self._limit(cur, "resolve", self._subject("resolve:" + actor), 10)
                 self._admin(cur, actor)
                 row = None
                 if digest:
