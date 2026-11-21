@@ -67,6 +67,9 @@ class FleetLumaApp extends StatelessWidget {
           foregroundColor: Colors.white,
         ),
       ),
+      routes: cloudMode && pairingUiEnabled
+          ? {'/devices/pair': (_) => const _CloudAuthGate(openDevicesOnLogin: true)}
+          : const {},
       home: cloudMode
           ? const _CloudAuthGate()
           : FleetScreen(
@@ -80,7 +83,8 @@ class FleetLumaApp extends StatelessWidget {
 
 /// The FleetScreen is not mounted and never polls until a session exists.
 class _CloudAuthGate extends StatefulWidget {
-  const _CloudAuthGate();
+  final bool openDevicesOnLogin;
+  const _CloudAuthGate({this.openDevicesOnLogin = false});
 
   @override
   State<_CloudAuthGate> createState() => _CloudAuthGateState();
@@ -92,6 +96,18 @@ class _CloudAuthGateState extends State<_CloudAuthGate> {
   String? _authorizedToken;
   Future<void>? _authorization;
   String? _authorizedWorkspaceId;
+  bool _didOpenPairingDeepLink = false;
+
+  void _openDeviceManagement(BuildContext context, GoTrueClient auth) {
+    Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => DeviceManagementScreen(
+        api: HttpFleetDeviceApi(
+          baseUrl: apiBaseUrl,
+          tokenProvider: () async => auth.currentSession?.accessToken,
+        ),
+      ),
+    ));
+  }
 
   Future<void> _checkOperatorAccess(String token) async {
     if (pairingUiEnabled) {
@@ -225,6 +241,13 @@ class _CloudAuthGateState extends State<_CloudAuthGate> {
             ),
           );
         }
+        if (widget.openDevicesOnLogin && pairingUiEnabled &&
+            !_didOpenPairingDeepLink) {
+          _didOpenPairingDeepLink = true;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) _openDeviceManagement(context, auth);
+          });
+        }
         return FleetScreen(
           key: ValueKey(session.user.id),
           controller: FleetController(
@@ -238,16 +261,9 @@ class _CloudAuthGateState extends State<_CloudAuthGate> {
           ),
           apiUrl: apiBaseUrl,
           onSignOut: () async => auth.signOut(),
-          onManageDevices: pairingUiEnabled ? () {
-            Navigator.of(context).push(MaterialPageRoute<void>(
-              builder: (_) => DeviceManagementScreen(
-                api: HttpFleetDeviceApi(
-                  baseUrl: apiBaseUrl,
-                  tokenProvider: () async => auth.currentSession?.accessToken,
-                ),
-              ),
-            ));
-          } : null,
+          onManageDevices: pairingUiEnabled
+              ? () => _openDeviceManagement(context, auth)
+              : null,
         );
       },
     );
