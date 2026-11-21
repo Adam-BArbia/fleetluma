@@ -149,6 +149,7 @@ jobs:
         run: |
           flutter build web --release \
             --dart-define=FLEETLUMA_CLOUD_MODE=true \
+            --dart-define=FLEETLUMA_PAIRING_UI_ENABLED="$FLEETLUMA_PAIRING_UI_ENABLED" \
             --dart-define=FLEETLUMA_API_BASE_URL="$FLEETLUMA_API_ORIGIN" \
             --dart-define=FLEETLUMA_SUPABASE_URL="$FLEETLUMA_SUPABASE_URL" \
             --dart-define=FLEETLUMA_SUPABASE_PUBLISHABLE_KEY="$FLEETLUMA_SUPABASE_PUBLISHABLE_KEY"
