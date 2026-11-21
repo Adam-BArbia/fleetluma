@@ -129,11 +129,7 @@ def test_pairing_approve_poll_ingest_revoke_and_reject_old_token(pairer):
 def test_unreviewed_id_cannot_approve_and_cancelled_code_cannot_pair(pairer):
     workspace=pairer.workspaces(OWNER)["items"][0]["id"]
     ticket,token=_request(pairer,name="test-cancel",key="ci-client-cancel")
-    with _connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute("SELECT id FROM fleetluma.pairing_sessions WHERE user_code_hash=%s",
-                        (pairer._subject("not-the-code"),))
-            # Session UUID by itself provides no approval capability.
+    # Session UUID by itself provides no approval capability.
     arbitrary=str(uuid4())
     with pytest.raises(PairingFailure) as err:
         pairer.approve(arbitrary,workspace,OWNER)
@@ -145,10 +141,20 @@ def test_unreviewed_id_cannot_approve_and_cancelled_code_cannot_pair(pairer):
 
 
 def test_rate_limit_denied_requests_persist(pairer):
-    for i in range(5):
+    # Independent admin avoids coupling to previous tests' rate limit state.
+    admin=str(uuid4())
+    workspace=pairer.workspaces(OWNER)["items"][0]["id"]
+    with _connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("INSERT INTO auth.users(id) VALUES (%s)",(admin,))
+            cur.execute("""
+              INSERT INTO fleetluma.workspace_memberships(workspace_id,user_id,role)
+              VALUES(%s,%s,'admin')
+            """,(workspace,admin))
+    for i in range(10):
         with pytest.raises(PairingFailure) as err:
-            pairer.resolve("AAAA-AAAA",OWNER)
+            pairer.resolve("AAAA-AAAA",admin)
         assert err.value.status==404
     with pytest.raises(PairingFailure) as limit:
-        pairer.resolve("AAAA-AAAA",OWNER)
+        pairer.resolve("AAAA-AAAA",admin)
     assert limit.value.status==429
