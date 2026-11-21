@@ -43,7 +43,9 @@ class _DeviceManagementScreenState extends State<DeviceManagementScreen> {
         _error = 'The action could not be completed. Check your access, code, or connection.';
       });
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted) {
+        setState(() => _busy = false);
+      }
     }
   }
 
