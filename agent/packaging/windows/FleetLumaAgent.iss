@@ -62,7 +62,7 @@ var
   Target, Arguments: String;
 begin
   Target := ExpandConstant('{commonappdata}\FleetLuma');
-  ; {SID}-based ACLs work on localized Windows installations.
+  // SID-based ACLs work on localized Windows installations.
   Arguments := '"' + Target + '" /inheritance:r /grant:r ' +
     '"*S-1-5-18:(OI)(CI)F" "*S-1-5-32-544:(OI)(CI)F" /T';
   if not Exec(ExpandConstant('{sys}\icacls.exe'), Arguments, '',
@@ -94,7 +94,7 @@ begin
       for I := 1 to 20 do
       begin
         Sleep(500);
-        ; Windows may take several seconds to stop a monitored service.
+        // Windows may take several seconds to stop a monitored service.
       end;
     end;
   end;
@@ -107,7 +107,7 @@ begin
       ScCommand('create FleetLumaAgent binPath= "' + BinaryPath +
                 '" start= auto obj= LocalSystem DisplayName= "FleetLuma Monitoring Agent"');
     end;
-    ; Enable the dedicated service SID used by the protected pipe ACL.
+    // Enable the dedicated service SID used by the protected pipe ACL.
     ScCommand('sidtype FleetLumaAgent unrestricted');
     ScCommand('config FleetLumaAgent start= auto');
     ScCommand('start FleetLumaAgent');
