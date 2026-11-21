@@ -4,8 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'data/fleet_api.dart';
+import 'data/device_api.dart';
 import 'state/fleet_controller.dart';
 import 'ui/fleet_screen.dart';
+import 'ui/device_management_screen.dart';
 import 'ui/sign_in_screen.dart';
 import 'ui/sign_up_screen.dart';
 
@@ -14,6 +16,8 @@ const apiBaseUrl = String.fromEnvironment(
   defaultValue: 'http://10.0.2.2:8000',
 );
 const cloudMode = bool.fromEnvironment('FLEETLUMA_CLOUD_MODE');
+// Hidden until server migration + workspace-scoped API are actually deployed.
+const pairingUiEnabled = bool.fromEnvironment('FLEETLUMA_PAIRING_UI_ENABLED');
 // UI feature gate, NOT an authorization boundary. Set Supabase Auth policy separately.
 const registrationEnabled = bool.fromEnvironment('FLEETLUMA_ALLOW_SIGN_UP');
 const supabaseUrl = String.fromEnvironment('FLEETLUMA_SUPABASE_URL');
@@ -87,16 +91,37 @@ class _CloudAuthGateState extends State<_CloudAuthGate> {
   bool _showSignUp = false;
   String? _authorizedToken;
   Future<void>? _authorization;
+  String? _authorizedWorkspaceId;
 
   Future<void> _checkOperatorAccess(String token) async {
-    await HttpFleetApi(baseUrl: apiBaseUrl, tokenProvider: () async => token)
-        .fetchHosts();
+    if (pairingUiEnabled) {
+      final manager = HttpFleetDeviceApi(
+        baseUrl: apiBaseUrl,
+        tokenProvider: () async => token,
+      );
+      final permitted = await manager.workspaces();
+      if (permitted.isEmpty) {
+        throw const FleetAccessDeniedException();
+      }
+      final workspace = permitted.first.id;
+      await HttpFleetApi(
+        baseUrl: apiBaseUrl,
+        tokenProvider: () async => token,
+        workspaceIdProvider: () async => workspace,
+      ).fetchHosts();
+      _authorizedWorkspaceId = workspace;
+    } else {
+      await HttpFleetApi(baseUrl: apiBaseUrl, tokenProvider: () async => token)
+          .fetchHosts();
+      _authorizedWorkspaceId = null;
+    }
   }
 
   void _retryAccess() {
     setState(() {
       _authorizedToken = null;
       _authorization = null;
+      _authorizedWorkspaceId = null;
     });
   }
 
@@ -139,6 +164,7 @@ class _CloudAuthGateState extends State<_CloudAuthGate> {
     final token = session.accessToken;
     if (_authorization == null || _authorizedToken != token) {
       _authorizedToken = token;
+      _authorizedWorkspaceId = null;
       _authorization = _checkOperatorAccess(token);
     }
     return FutureBuilder<void>(
@@ -205,10 +231,23 @@ class _CloudAuthGateState extends State<_CloudAuthGate> {
             api: HttpFleetApi(
               baseUrl: apiBaseUrl,
               tokenProvider: () async => auth.currentSession?.accessToken,
+              workspaceIdProvider: pairingUiEnabled
+                  ? () async => _authorizedWorkspaceId
+                  : null,
             ),
           ),
           apiUrl: apiBaseUrl,
           onSignOut: () async => auth.signOut(),
+          onManageDevices: pairingUiEnabled ? () {
+            Navigator.of(context).push(MaterialPageRoute<void>(
+              builder: (_) => DeviceManagementScreen(
+                api: HttpFleetDeviceApi(
+                  baseUrl: apiBaseUrl,
+                  tokenProvider: () async => auth.currentSession?.accessToken,
+                ),
+              ),
+            ));
+          } : null,
         );
       },
     );

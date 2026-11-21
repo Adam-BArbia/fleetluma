@@ -18,12 +18,14 @@ class HttpFleetApi implements FleetApi {
   final Duration timeout;
   final http.Client? _injectedClient;
   final Future<String?> Function()? tokenProvider;
+  final Future<String?> Function()? workspaceIdProvider;
 
   HttpFleetApi({
     required String baseUrl,
     this.timeout = const Duration(seconds: 5),
     http.Client? client,
     this.tokenProvider,
+    this.workspaceIdProvider,
   })  : _injectedClient = client,
         baseUri = Uri.parse(baseUrl) {
     if (!baseUri.hasAuthority ||
@@ -36,8 +38,14 @@ class HttpFleetApi implements FleetApi {
   Future<List<HostSnapshot>> fetchHosts() async {
     final client = _injectedClient ?? http.Client();
     try {
+      final workspaceId = await workspaceIdProvider?.call();
+      if (workspaceIdProvider != null &&
+          (workspaceId == null || workspaceId.isEmpty)) {
+        throw const FleetAccessDeniedException();
+      }
       final endpoint = baseUri.replace(
         path: '${baseUri.path.replaceFirst(RegExp(r'/$'), '')}/api/v1/hosts',
+        queryParameters: workspaceId == null ? null : {'workspace_id': workspaceId},
       );
       final headers = <String, String>{'Accept': 'application/json'};
       if (tokenProvider != null) {
