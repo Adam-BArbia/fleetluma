@@ -1,0 +1,77 @@
+name: FleetLuma Android cloud demo APK
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/flutter-cloud-android-demo.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  android-cloud-demo:
+    # Never run secret-bearing environment builds from PR branches.
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: fleetluma-preview
+    timeout-minutes: 35
+    env:
+      FLEETLUMA_API_ORIGIN: https://fleetluma-api.vercel.app
+      FLEETLUMA_SUPABASE_URL: ${{ vars.FLEETLUMA_SUPABASE_URL }}
+      FLEETLUMA_SUPABASE_PUBLISHABLE_KEY: ${{ vars.FLEETLUMA_SUPABASE_PUBLISHABLE_KEY }}
+    steps:
+      - name: Fail closed on missing public cloud configuration
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import os
+          from urllib.parse import urlsplit
+
+          api = urlsplit(os.environ["FLEETLUMA_API_ORIGIN"])
+          supabase = urlsplit(os.environ.get("FLEETLUMA_SUPABASE_URL", ""))
+          public_key = os.environ.get("FLEETLUMA_SUPABASE_PUBLISHABLE_KEY", "")
+          if (api.scheme != "https" or api.hostname != "fleetluma-api.vercel.app"
+              or api.path or api.query or api.fragment
+              or supabase.scheme != "https"
+              or not (supabase.hostname or "").endswith(".supabase.co")
+              or supabase.path or supabase.query or supabase.fragment
+              or not public_key.startswith("sb_publishable_")):
+              raise SystemExit("Refusing APK build: cloud configuration is missing or invalid")
+          print("PASS: HTTPS API, Supabase and public key configuration validated")
+          PY
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.50.0'
+          channel: stable
+          cache: true
+      - name: Generate Android platform scaffold
+        working-directory: mobile
+        run: flutter create --platforms=android --project-name fleetluma .
+      - name: Verify Flutter code
+        working-directory: mobile
+        run: |
+          flutter pub get
+          flutter analyze
+          flutter test
+      - name: Build installable CLOUD demo APK (debug signed, no pairing)
+        working-directory: mobile
+        shell: bash
+        run: |
+          flutter build apk --debug \
+            --dart-define=FLEETLUMA_CLOUD_MODE=true \
+            --dart-define=FLEETLUMA_PAIRING_UI_ENABLED=false \
+            --dart-define=FLEETLUMA_API_BASE_URL="$FLEETLUMA_API_ORIGIN" \
+            --dart-define=FLEETLUMA_SUPABASE_URL="$FLEETLUMA_SUPABASE_URL" \
+            --dart-define=FLEETLUMA_SUPABASE_PUBLISHABLE_KEY="$FLEETLUMA_SUPABASE_PUBLISHABLE_KEY"
+          test -s build/app/outputs/flutter-apk/app-debug.apk
+      - name: Upload classroom demo APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: fleetluma-android-cloud-demo-debug-apk
+          path: mobile/build/app/outputs/flutter-apk/app-debug.apk
+          retention-days: 7
+          if-no-files-found: error
