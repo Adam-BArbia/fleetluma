@@ -1,0 +1,61 @@
+name: FleetLuma V1 public API smoke
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/v1-cloud-smoke.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify-public-api:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check cloud API health and operator authentication boundary
+        env:
+          API_ORIGIN: https://fleetluma-api.vercel.app
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import urllib.request
+          from urllib.error import HTTPError
+
+          origin = os.environ["API_ORIGIN"]
+          class NoRedirect(urllib.request.HTTPRedirectHandler):
+              def redirect_request(self, *args, **kwargs):
+                  return None
+
+          opener = urllib.request.build_opener(
+              NoRedirect(), urllib.request.ProxyHandler({}))
+
+          def probe(path):
+              request = urllib.request.Request(
+                  origin + path,
+                  headers={"Accept": "application/json"},
+                  method="GET")
+              try:
+                  with opener.open(request, timeout=15) as response:
+                      return response.status, response.read(4096)
+              except HTTPError as error:
+                  return error.code, b""
+
+          code, body = probe("/health")
+          if code != 200:
+              raise SystemExit(f"FAIL: API /health HTTP {code} (expected 200)")
+          try:
+              health = json.loads(body)
+          except ValueError:
+              raise SystemExit("FAIL: health returned invalid JSON")
+          if health.get("status") != "ready" or health.get("mode") != "cloud":
+              raise SystemExit("FAIL: health did not report ready cloud mode")
+
+          code, _ = probe("/api/v1/hosts")
+          if code not in (401, 403):
+              raise SystemExit(
+                  f"FAIL: unauthenticated host listing returned HTTP {code}")
+          print("PASS: public HTTPS health ready/cloud and fleet data protected")
+          PY
