@@ -99,3 +99,30 @@ jobs:
                   raise SystemExit("FAIL: synthetic session cancellation failed")
           print("PASS: synthetic pairing created and cancelled without enrolling a host")
           PY
+
+      - name: Verify browser CORS only permits the trusted Web origin
+        run: |
+          python3 - <<'PY'
+          import os
+          from urllib.request import Request, build_opener, HTTPRedirectHandler, ProxyHandler
+          from urllib.error import HTTPError
+          class BlockRedirect(HTTPRedirectHandler):
+              def redirect_request(self, *args, **kwargs):
+                  return None
+          opener = build_opener(BlockRedirect(), ProxyHandler({}))
+          origin = "https://fleetluma-web.vercel.app"
+          request = Request(
+              os.environ["API_ORIGIN"] + "/api/v1/hosts", method="OPTIONS",
+              headers={
+                  "Origin": origin,
+                  "Access-Control-Request-Method": "GET",
+                  "Access-Control-Request-Headers": "authorization",
+              })
+          with opener.open(request, timeout=15) as response:
+              status = response.status
+              allowed = response.headers.get("access-control-allow-origin")
+              allowed_headers = response.headers.get("access-control-allow-headers", "")
+          if status != 200 or allowed != origin or "authorization" not in allowed_headers.lower():
+              raise SystemExit("FAIL: trusted Web origin/auth header CORS preflight rejected")
+          print("PASS: HTTPS Web origin may send authorization-bearing requests")
+          PY
