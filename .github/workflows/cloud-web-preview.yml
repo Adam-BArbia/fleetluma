@@ -61,8 +61,8 @@ jobs:
     environment: fleetluma-preview
     timeout-minutes: 30
     env:
-      FLEETLUMA_API_ORIGIN: ${{ github.event_name == 'push' && 'https://fleetluma-h2nlyfk1h-fleet-luma.vercel.app' || (github.event_name == 'workflow_dispatch' && inputs.api_origin || 'https://fleetluma-api.vercel.app') }}
-      FLEETLUMA_PAIRING_UI_ENABLED: ${{ github.event_name == 'push' && 'true' || (github.event_name == 'workflow_dispatch' && inputs.enable_pairing_ui && 'true' || 'false') }}
+      FLEETLUMA_API_ORIGIN: ${{ github.event_name == 'workflow_dispatch' && inputs.api_origin || 'https://fleetluma-api.vercel.app' }}
+      FLEETLUMA_PAIRING_UI_ENABLED: ${{ github.event_name == 'workflow_dispatch' && inputs.enable_pairing_ui && 'true' || 'false' }}
       FLEETLUMA_SUPABASE_URL: ${{ vars.FLEETLUMA_SUPABASE_URL }}
       FLEETLUMA_SUPABASE_PUBLISHABLE_KEY: ${{ vars.FLEETLUMA_SUPABASE_PUBLISHABLE_KEY }}
       VERCEL_CLI_VERSION: ${{ vars.VERCEL_CLI_VERSION }}
@@ -104,7 +104,7 @@ jobs:
           PY
 
       - name: Verify pairing API is enabled before exposing onboarding UI
-        if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.enable_pairing_ui) }}
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.enable_pairing_ui }}
         shell: bash
         run: |
           python3 - <<'PY'
