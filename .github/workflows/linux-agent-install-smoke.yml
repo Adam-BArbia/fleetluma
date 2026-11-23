@@ -60,6 +60,21 @@ jobs:
             echo "Unexpected local control return value" >&2
             exit 1
           fi
+      - name: Verify installed Linux service generates and cancels live pairing
+        if: ${{ github.event_name == 'pull_request' && startsWith(github.head_ref, 'test/v1-linux-live-installed-pairing') }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          trap 'sudo fleetluma-control cancel >/dev/null 2>&1 || true' EXIT
+          sudo systemctl is-active --quiet fleetluma-agent.service
+          sudo fleetluma-control begin >/tmp/fleetluma-live-pairing.out
+          grep -q '^Pairing code: ' /tmp/fleetluma-live-pairing.out
+          grep -q '^Open: https://fleetluma-web.vercel.app/devices/pair' /tmp/fleetluma-live-pairing.out
+          grep -q '^Seconds remaining: ' /tmp/fleetluma-live-pairing.out
+          sudo fleetluma-control cancel >/tmp/fleetluma-cancel.out
+          grep -q '^No paired device.' /tmp/fleetluma-cancel.out
+          test ! -e /var/lib/fleetluma/private/identity.bin
+          echo "PASS: installed Linux systemd agent initiated and cancelled cloud pairing"
       - name: Purge and verify credential and service file removal
         run: |
           sudo dpkg --purge fleetluma-agent
