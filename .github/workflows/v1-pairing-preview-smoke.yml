@@ -51,3 +51,51 @@ jobs:
               raise SystemExit(f"FAIL: host monitoring exposed without JWT (HTTP {status})")
           print("PASS: pairing preview DB ready, routes enabled, operator routes locked")
           PY
+
+      - name: Start and cancel a synthetic pairing (no host enrollment)
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, os, secrets
+          from urllib.request import Request, build_opener, HTTPRedirectHandler, ProxyHandler
+          from urllib.error import HTTPError
+
+          class BlockRedirect(HTTPRedirectHandler):
+              def redirect_request(self, *args, **kwargs):
+                  return None
+          opener = build_opener(BlockRedirect(), ProxyHandler({}))
+          origin = os.environ["API_ORIGIN"]
+
+          def post(path, obj):
+              req = Request(origin + path,
+                            data=json.dumps(obj).encode(),
+                            method="POST",
+                            headers={"Content-Type": "application/json"})
+              with opener.open(req, timeout=15) as r:
+                  return r.status, r.read(4096)
+
+          random_digest = hashlib.sha256(secrets.token_bytes(32)).hexdigest()
+          payload = {
+              "hostname": "fleetluma-smoke-" + secrets.token_hex(4),
+              "platform": "linux",
+              "agent_version": "v1.0-smoke",
+              "report_token_sha256": random_digest,
+              "capabilities": ["cpu", "memory", "disk"]
+          }
+          status, response = post("/api/v1/agent/pairings", payload)
+          if status != 201:
+              raise SystemExit("FAIL: pairing request was not accepted")
+          result = json.loads(response)
+          device_code = result.get("device_code")
+          if not isinstance(device_code, str) or len(device_code) < 32:
+              raise SystemExit("FAIL: pairing response lacked a private device code")
+          try:
+              if len(result.get("user_code", "")) != 9:
+                  raise SystemExit("FAIL: public user code malformed")
+              if result.get("expires_in") != 600:
+                  raise SystemExit("FAIL: unexpected expiry")
+          finally:
+              code, _ = post("/api/v1/agent/pairings/cancel", {"device_code": device_code})
+              if code != 204:
+                  raise SystemExit("FAIL: synthetic session cancellation failed")
+          print("PASS: synthetic pairing created and cancelled without enrolling a host")
+          PY
