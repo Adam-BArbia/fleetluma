@@ -4,6 +4,11 @@
 name: FleetLuma cloud Web preview
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'mobile/**'
+      - '.github/workflows/cloud-web-preview.yml'
   pull_request:
     paths:
       - '.github/workflows/cloud-web-preview.yml'
@@ -49,15 +54,15 @@ jobs:
 
   deploy-web-preview:
     name: Build Flutter Web and publish protected preview
-    # No deployments from PRs or non-main refs; explicit dispatch only.
-    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' }}
+    # Only reviewed main may publish previews. Never deploy pull requests.
+    if: ${{ (github.event_name == 'workflow_dispatch' || github.event_name == 'push') && github.ref == 'refs/heads/main' }}
     needs: preview-contract
     runs-on: ubuntu-latest
     environment: fleetluma-preview
     timeout-minutes: 30
     env:
-      FLEETLUMA_API_ORIGIN: ${{ inputs.api_origin }}
-      FLEETLUMA_PAIRING_UI_ENABLED: ${{ inputs.enable_pairing_ui && 'true' || 'false' }}
+      FLEETLUMA_API_ORIGIN: ${{ github.event_name == 'workflow_dispatch' && inputs.api_origin || 'https://fleetluma-api.vercel.app' }}
+      FLEETLUMA_PAIRING_UI_ENABLED: ${{ github.event_name == 'workflow_dispatch' && inputs.enable_pairing_ui && 'true' || 'false' }}
       FLEETLUMA_SUPABASE_URL: ${{ vars.FLEETLUMA_SUPABASE_URL }}
       FLEETLUMA_SUPABASE_PUBLISHABLE_KEY: ${{ vars.FLEETLUMA_SUPABASE_PUBLISHABLE_KEY }}
       VERCEL_CLI_VERSION: ${{ vars.VERCEL_CLI_VERSION }}
@@ -99,7 +104,7 @@ jobs:
           PY
 
       - name: Verify pairing API is enabled before exposing onboarding UI
-        if: ${{ inputs.enable_pairing_ui }}
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.enable_pairing_ui }}
         shell: bash
         run: |
           python3 - <<'PY'
