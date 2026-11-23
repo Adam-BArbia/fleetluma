@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import sys
 import threading
+import webbrowser
 import tkinter as tk
 from tkinter import ttk
 from urllib.parse import urlsplit
@@ -60,8 +61,8 @@ class AgentSetupWindow:
         self._after_id = None
 
         master.title("FleetLuma · Agent Setup")
-        master.minsize(430, 450)
-        master.geometry("550x480")
+        master.minsize(430, 540)
+        master.geometry("550x570")
         master.configure(bg=BACKGROUND)
         master.protocol("WM_DELETE_WINDOW", self.close)
 
@@ -116,7 +117,24 @@ class AgentSetupWindow:
                                          command=lambda: self._invoke("status"),
                                          style="Fleet.TButton")
         self.refresh_button.pack(side="right")
+        self.open_dashboard_button = ttk.Button(
+            outer, text="Open FleetLuma dashboard",
+            command=self._open_dashboard, style="Fleet.TButton")
+        self.open_dashboard_button.pack(anchor="w", pady=(26, 0))
+        ttk.Label(
+            outer, text="After approval, monitoring starts automatically.",
+            style="Fleet.TLabel", font=("Segoe UI", 10)
+        ).pack(anchor="w", pady=(8, 0))
         self._invoke("status")
+
+    def _open_dashboard(self):
+        # A fixed, trusted public operator URL; never open a link returned
+        # from a pairing response or expose agent credentials to the browser.
+        try:
+            webbrowser.open("https://fleetluma-web.vercel.app/devices/pair")
+        except Exception:
+            self.feedback.configure(
+                text="Open https://fleetluma-web.vercel.app in your browser.")
 
     def _invoke(self, action: str):
         if self._closed or self._busy:
