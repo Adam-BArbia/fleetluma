@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     env:
-      API_ORIGIN: https://fleetluma-h2nlyfk1h-fleet-luma.vercel.app
+      API_ORIGIN: https://fleetluma-api.vercel.app
     steps:
       - name: Fail closed on health and enrollment auth
         run: |
