@@ -67,7 +67,7 @@ class _SignInScreenState extends State<SignInScreen> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Center(
-                        Container(
+                        child: Container(
                           width: 60,
                           height: 60,
                           decoration: BoxDecoration(
@@ -78,7 +78,6 @@ class _SignInScreenState extends State<SignInScreen> {
                           child: const Icon(Icons.radar_rounded,
                               size: 34, color: Color(0xFF55E5D3)),
                         ),
-  
                       ),
                       const SizedBox(height: 14),
                       const Text('FleetLuma',
