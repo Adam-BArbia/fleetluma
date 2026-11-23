@@ -87,7 +87,7 @@ class _SignInScreenState extends State<SignInScreen> {
                           textAlign: TextAlign.center,
                           style: TextStyle(color: Color(0xFFA1AFCA))),
                       const SizedBox(height: 8),
-                      const Text('Sign in to your workspace',
+                      const Text('Operator sign in',
                           textAlign: TextAlign.center,
                           style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
                       const SizedBox(height: 24),
