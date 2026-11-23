@@ -56,16 +56,74 @@ class FleetLumaApp extends StatelessWidget {
       theme: ThemeData(
         useMaterial3: true,
         brightness: Brightness.dark,
-        scaffoldBackgroundColor: navy,
+        scaffoldBackgroundColor: const Color(0xFF080E1A),
         colorScheme: ColorScheme.fromSeed(
           seedColor: cyan,
           brightness: Brightness.dark,
-          surface: const Color(0xFF151F34),
+          surface: const Color(0xFF111D30),
+        ).copyWith(
+          primary: cyan,
+          onPrimary: navy,
+          secondary: const Color(0xFF86A7FF),
+          onSurface: const Color(0xFFF3F7FF),
+          outline: const Color(0xFF33465F),
+          error: const Color(0xFFFF8D95),
+        ),
+        textTheme: const TextTheme(
+          headlineMedium: TextStyle(
+            fontSize: 28, fontWeight: FontWeight.w800, letterSpacing: -0.8),
+          titleLarge: TextStyle(
+            fontSize: 21, fontWeight: FontWeight.w800, letterSpacing: -0.4),
+          titleMedium: TextStyle(fontWeight: FontWeight.w700),
+          bodyMedium: TextStyle(height: 1.45),
+        ),
+        cardTheme: CardThemeData(
+          color: const Color(0xFF111D30),
+          elevation: 0,
+          margin: EdgeInsets.zero,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+            side: const BorderSide(color: Color(0xFF27374E)),
+          ),
+        ),
+        inputDecorationTheme: InputDecorationTheme(
+          filled: true,
+          fillColor: const Color(0xFF0D1728),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16, vertical: 17),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Color(0xFF34475C))),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Color(0xFF34475C))),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: cyan, width: 1.5)),
+        ),
+        filledButtonTheme: FilledButtonThemeData(
+          style: FilledButton.styleFrom(
+            minimumSize: const Size(0, 46),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12)),
+            textStyle: const TextStyle(fontWeight: FontWeight.w700),
+          ),
+        ),
+        outlinedButtonTheme: OutlinedButtonThemeData(
+          style: OutlinedButton.styleFrom(
+            minimumSize: const Size(0, 46),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12)),
+            side: const BorderSide(color: Color(0xFF34475C)),
+          ),
         ),
         appBarTheme: const AppBarTheme(
-          backgroundColor: navy,
+          backgroundColor: Color(0xFF080E1A),
+          surfaceTintColor: Colors.transparent,
           foregroundColor: Colors.white,
         ),
+        dividerTheme: const DividerThemeData(
+          color: Color(0xFF24354B), thickness: 1),
       ),
       routes: cloudMode && pairingUiEnabled
           ? {'/devices/pair': (_) => const _CloudAuthGate(openDevicesOnLogin: true)}
