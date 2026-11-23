@@ -30,6 +30,7 @@
 - Exact browser Origin CORS and authorization header preflight passed.
 - Flutter Web analysis, unit/widget tests and build passed; paired Web preview built after the operator 401 gate.
 - Windows signed? **NO**. Unsigned candidate build/install/service/pipe/ACL/uninstall tests passed in isolated Windows CI.
+- A live cloud pairing initiation and cancellation was run from an **actually installed Windows SCM service** on a Windows GitHub runner (PR #64, isolated acceptance passed). No synthetic machine was approved.
 - Linux signed? **NO**. Debian package install/systemd/socket/purge CI checks passed; interactive setup helper included.
 - Android Cloud APK built and tests passed with operator authentication preflight.
 
