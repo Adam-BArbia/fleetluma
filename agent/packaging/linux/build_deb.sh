@@ -15,6 +15,7 @@ rm -rf "$STAGING"
 mkdir -p "$STAGING/DEBIAN"          "$STAGING/usr/lib/fleetluma"          "$STAGING/usr/bin"          "$STAGING/lib/systemd/system"
 cp -a dist/fleetluma-agent/. "$STAGING/usr/lib/fleetluma/"
 cp dist/fleetluma-control "$STAGING/usr/bin/fleetluma-control"
+cp agent/packaging/linux/fleetluma-setup "$STAGING/usr/bin/fleetluma-setup"
 cp agent/packaging/linux/fleetluma-agent.service    "$STAGING/lib/systemd/system/fleetluma-agent.service"
 cp agent/packaging/linux/debian/control "$STAGING/DEBIAN/control"
 for maintainer_script in postinst prerm postrm; do
@@ -23,6 +24,7 @@ for maintainer_script in postinst prerm postrm; do
 done
 chmod 0755 "$STAGING/usr/lib/fleetluma/fleetluma-agent"
 chmod 0755 "$STAGING/usr/bin/fleetluma-control"
+chmod 0755 "$STAGING/usr/bin/fleetluma-setup"
 chmod 0644 "$STAGING/lib/systemd/system/fleetluma-agent.service"
 dpkg-deb --build --root-owner-group "$STAGING" "$OUTPUT"
 echo "Developer candidate generated: $OUTPUT"

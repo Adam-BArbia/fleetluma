@@ -1,0 +1,42 @@
+#!/bin/sh
+# Friendly, secret-safe FleetLuma Linux pairing entrypoint.
+set -eu
+
+if [ "$(id -u)" -ne 0 ]; then
+  echo "FleetLuma setup needs administrator access." >&2
+  echo "Run: sudo fleetluma-setup" >&2
+  exit 2
+fi
+
+if ! command -v fleetluma-control >/dev/null 2>&1; then
+  echo "FleetLuma control helper is missing. Reinstall the agent package." >&2
+  exit 2
+fi
+
+if ! systemctl is-active --quiet fleetluma-agent.service; then
+  echo "FleetLuma background service is not running; trying to start it..."
+  if ! systemctl start fleetluma-agent.service; then
+    echo "Cannot start the agent. Check: systemctl status fleetluma-agent" >&2
+    exit 2
+  fi
+fi
+
+printf '\nFleetLuma Agent Setup\n====================\n'
+printf 'Checking enrollment state...\n'
+fleetluma-control status || true
+printf '\nStart secure pairing on this computer? [y/N] '
+IFS= read -r choice || exit 1
+case "$choice" in
+  y|Y|yes|YES)
+    printf '\nRequesting a one-time pairing code...\n'
+    fleetluma-control begin
+    printf '\nOpen https://fleetluma-web.vercel.app in your browser.\n'
+    printf 'Sign in as an approved operator, choose Manage devices, enter the code,\n'
+    printf 'verify this computer, and approve it.\n'
+    printf 'The background service will start reporting automatically after approval.\n'
+    printf '\nCheck progress: sudo fleetluma-control status\n'
+    ;;
+  *)
+    echo "No changes made. Use 'sudo fleetluma-setup' when ready."
+    ;;
+esac
