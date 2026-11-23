@@ -100,6 +100,25 @@ jobs:
         shell: pwsh
         run: |
           python -c "from fleetluma_agent.windows_control import windows_command; result=windows_command('status'); assert result.get('status')=='not_paired', result.get('status'); assert 'report_token' not in result; assert 'device_code' not in result; print('Restricted pipe status response OK')"
+      - name: Verify installed service generates and cancels live pairing
+        if: ${{ github.event_name == 'pull_request' && startsWith(github.head_ref, 'test/v1-windows-live-installed-pairing') }}
+        working-directory: agent
+        shell: pwsh
+        run: |
+          @'
+          from fleetluma_agent.windows_control import windows_command
+          result = windows_command("begin", timeout_ms=5000)
+          try:
+              assert result.get("status") == "waiting", "Installed service could not begin cloud pairing"
+              assert isinstance(result.get("user_code"), str) and len(result["user_code"]) == 9
+              assert result.get("verification_uri") == "https://fleetluma-web.vercel.app/devices/pair"
+              assert "device_code" not in result and "report_token" not in result
+          finally:
+              cancelled = windows_command("cancel", timeout_ms=5000)
+              assert cancelled.get("status") == "not_paired", "Pending code was not cancelled"
+          print("PASS: installed SCM service generated and cancelled pairing without exposing secrets")
+          '@ | python -
+          if ($LASTEXITCODE -ne 0) { throw "Installed Windows pairing smoke failed" }
       - name: Verify no broad access on protected identity directory
         shell: pwsh
         run: |
