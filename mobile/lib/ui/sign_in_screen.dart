@@ -66,16 +66,19 @@ class _SignInScreenState extends State<SignInScreen> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Container(
-                        width: 60,
-                        height: 60,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF173A43),
-                          border: Border.all(color: const Color(0xFF2B6A67)),
-                          borderRadius: BorderRadius.circular(18),
+                      Center(
+                        Container(
+                          width: 60,
+                          height: 60,
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF173A43),
+                            border: Border.all(color: const Color(0xFF2B6A67)),
+                            borderRadius: BorderRadius.circular(18),
+                          ),
+                          child: const Icon(Icons.radar_rounded,
+                              size: 34, color: Color(0xFF55E5D3)),
                         ),
-                        child: const Icon(Icons.radar_rounded,
-                            size: 34, color: Color(0xFF55E5D3)),
+  
                       ),
                       const SizedBox(height: 14),
                       const Text('FleetLuma',
