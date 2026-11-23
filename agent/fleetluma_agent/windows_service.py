@@ -44,7 +44,7 @@ if sys.platform == "win32":
             # not a secret. The private reporting token comes from DPAPI only.
             origin = os.environ.get(
                 "FLEETLUMA_COORDINATOR_URL",
-                "https://fleetluma-6n0ogdlgr-fleet-luma.vercel.app",
+                "https://fleetluma-api.vercel.app",
             )
             client = PairingHttpClient(origin)
             controller = EnrollmentController(store, client)

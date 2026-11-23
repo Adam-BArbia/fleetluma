@@ -9,7 +9,7 @@ case "${1:-}" in
     install -d -o fleetluma -g fleetluma -m 0700 /var/lib/fleetluma
     install -d -o root -g root -m 0755 /etc/fleetluma
     if [ ! -e /etc/fleetluma/agent.conf ]; then
-      printf '%s\n' 'FLEETLUMA_COORDINATOR_URL=https://fleetluma-6n0ogdlgr-fleet-luma.vercel.app' > /etc/fleetluma/agent.conf
+      printf '%s\n' 'FLEETLUMA_COORDINATOR_URL=https://fleetluma-api.vercel.app' > /etc/fleetluma/agent.conf
       chmod 0644 /etc/fleetluma/agent.conf
     fi
     if [ -d /run/systemd/system ]; then
