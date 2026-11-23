@@ -1,0 +1,138 @@
+name: Publish FleetLuma V1 classroom demo pre-release
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/publish-v1-demo-release.yml
+
+permissions:
+  actions: read
+  contents: write
+
+concurrency:
+  group: fleetluma-v1-demo-release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: github.repository == 'Adam-BArbia/fleetluma' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_TAG: v1-demo-2026-11-23
+    steps:
+      - name: Reject incomplete or replaced releases
+        id: existing
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            count="$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets | length')"
+            if [ "$count" -ge 4 ]; then
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+              echo "Pre-release already exists with $count assets; not replacing immutable binaries"
+            else
+              echo "::error::Incomplete pre-existing release: inspect manually; refusing overwrite"
+              exit 1
+            fi
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Verify approved source runs and fetch artifacts
+        if: steps.existing.outputs.skip == 'false'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p staging/windows staging/linux staging/android
+          for run in 45141323996 45143131797 45144051084; do
+            result="$(gh run view "$run" --repo "$GITHUB_REPOSITORY" --json conclusion --jq '.conclusion')"
+            branch="$(gh run view "$run" --repo "$GITHUB_REPOSITORY" --json headBranch --jq '.headBranch')"
+            if [ "$result" != "success" ] || [ "$branch" != "main" ]; then
+              echo "::error::Artifact run $run is not a successful main build"
+              exit 1
+            fi
+          done
+          gh run download 45141323996 --repo "$GITHUB_REPOSITORY" --name fleetluma-windows-unsigned-installer --dir staging/windows
+          gh run download 45143131797 --repo "$GITHUB_REPOSITORY" --name fleetluma-linux-unsigned-deb-candidate --dir staging/linux
+          gh run download 45144051084 --repo "$GITHUB_REPOSITORY" --name fleetluma-android-cloud-demo-debug-apk --dir staging/android
+
+      - name: Verify packages and generate checksums
+        if: steps.existing.outputs.skip == 'false'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -d '' -t windows < <(find staging/windows -type f -name '*.exe' -print0)
+          mapfile -d '' -t linux < <(find staging/linux -type f -name '*.deb' -print0)
+          mapfile -d '' -t android < <(find staging/android -type f -name '*.apk' -print0)
+          if [ "${#windows[@]}" -ne 1 ] || [ "${#linux[@]}" -ne 1 ] || [ "${#android[@]}" -ne 1 ]; then
+            echo "::error::Expected exactly one Windows EXE, one Linux DEB and one Android APK"
+            exit 1
+          fi
+          file "${windows[0]}" | grep -q 'PE32'
+          test "$(dpkg-deb --field "${linux[0]}" Architecture)" = "amd64"
+          unzip -tqq "${android[0]}"
+          mkdir -p release
+          cp "${windows[0]}" release/FleetLuma-Agent-Windows-UNSIGNED.exe
+          cp "${linux[0]}" release/FleetLuma-Agent-Linux-amd64-UNSIGNED.deb
+          cp "${android[0]}" release/FleetLuma-Android-DEBUG.apk
+          for binary in release/*; do
+            if [ "$(stat -c %s "$binary")" -lt 1048576 ]; then
+              echo "::error::Unexpectedly small package: $binary"
+              exit 1
+            fi
+          done
+          (cd release && sha256sum FleetLuma-* > SHA256SUMS.txt)
+          ls -lh release/
+
+      - name: Create unsigned classroom demo pre-release with assets
+        if: steps.existing.outputs.skip == 'false'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/FLEETLUMA_RELEASE_NOTES.md" <<'NOTES'
+          ## FleetLuma V1 — Classroom demo candidate (23 November 2026)
+
+          **PRE-RELEASE ONLY — Windows/Linux agents are UNSIGNED, Android is DEBUG-signed.**
+          These are developer/classroom builds, **not** audited or signed general-availability releases. Only install packages you trust; do not bypass unexpected OS security warnings.
+
+          ### Downloads
+          - **Windows 11 x64:** `FleetLuma-Agent-Windows-UNSIGNED.exe` — installer with FleetLuma background service and GUI pairing setup. No Python installation needed.
+          - **Ubuntu/Debian amd64:** `FleetLuma-Agent-Linux-amd64-UNSIGNED.deb` — systemd agent. After installing, run `sudo fleetluma-setup`.
+          - **Android:** `FleetLuma-Android-DEBUG.apk` — cloud-enabled Flutter dashboard for demonstration (not Play Store signed).
+          - **Integrity:** `SHA256SUMS.txt` — SHA-256 checksums of all three downloads.
+
+          ### Quick start
+          1. Open [FleetLuma Web](https://fleetluma-web.vercel.app) and sign in with an approved operator.
+          2. Install the Windows agent, open **FleetLuma Agent Setup**, and click **Start pairing** (or install Linux package then run `sudo fleetluma-setup`).
+          3. In the dashboard open **Manage devices**, enter the generated one-time code, review the requested device and approve it.
+          4. Confirm incoming CPU/RAM/disk metrics and CONNECTED status; allow time for a reporting interval.
+
+          ### Provenance
+          All assets come from successful GitHub Actions builds on this repository's `main` branch:
+          - Windows: [run 45141323996](https://github.com/Adam-BArbia/fleetluma/actions/runs/45141323996) (commit `f2eeb899`)
+          - Linux: [run 45143131797](https://github.com/Adam-BArbia/fleetluma/actions/runs/45143131797) (commit `ad2738c4`)
+          - Android: [run 45144051084](https://github.com/Adam-BArbia/fleetluma/actions/runs/45144051084) (commit `242ea3c2`)
+
+          Full [presentation quickstart](https://github.com/Adam-BArbia/fleetluma/blob/main/docs/releases/V1_PRESENTATION_QUICKSTART.md) and [release limitations](https://github.com/Adam-BArbia/fleetluma/blob/main/docs/releases/V1_DEMO_RELEASE_NOTES.md).
+
+          **Outstanding:** physical-host end-to-end acceptance, independent database restore rehearsal, signing and complete release hardening. Do not use these binaries as a general production rollout.
+          NOTES
+          gh release create "$RELEASE_TAG" release/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "FleetLuma V1 — Classroom Demo (Unsigned)" \
+            --notes-file "$RUNNER_TEMP/FLEETLUMA_RELEASE_NOTES.md" \
+            --prerelease
+
+      - name: Verify public release asset inventory
+        if: steps.existing.outputs.skip == 'false'
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json url,isPrerelease,assets --jq '{url,isPrerelease,assets:[.assets[].name]}'
+          count="$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets | length')"
+          test "$count" -eq 4
+          test "$(gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json isPrerelease --jq '.isPrerelease')" = "true"
