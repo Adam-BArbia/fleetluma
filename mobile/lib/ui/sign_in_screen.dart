@@ -66,16 +66,30 @@ class _SignInScreenState extends State<SignInScreen> {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      const Icon(Icons.radar_rounded,
-                          size: 42, color: Color(0xFF55E5D3)),
+                      Container(
+                        width: 60,
+                        height: 60,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF173A43),
+                          border: Border.all(color: const Color(0xFF2B6A67)),
+                          borderRadius: BorderRadius.circular(18),
+                        ),
+                        child: const Icon(Icons.radar_rounded,
+                            size: 34, color: Color(0xFF55E5D3)),
+                      ),
                       const SizedBox(height: 14),
                       const Text('FleetLuma',
                           textAlign: TextAlign.center,
                           style: TextStyle(fontSize: 27,
                               fontWeight: FontWeight.w800)),
                       const SizedBox(height: 6),
-                      const Text('Operator sign in',
-                          textAlign: TextAlign.center),
+                      const Text('Infrastructure, in focus.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: Color(0xFFA1AFCA))),
+                      const SizedBox(height: 8),
+                      const Text('Sign in to your workspace',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
                       const SizedBox(height: 24),
                       TextField(
                         controller: _email,
@@ -106,7 +120,6 @@ class _SignInScreenState extends State<SignInScreen> {
                         child: Text(_submitting ? 'Signing in…' : 'Sign in'),
                       ),
                       const SizedBox(height: 12),
-                      const SizedBox(height: 10),
                       OutlinedButton.icon(
                         onPressed: widget.onCreateAccount,
                         icon: const Icon(Icons.person_add_alt_outlined),
@@ -114,7 +127,9 @@ class _SignInScreenState extends State<SignInScreen> {
                             ? 'Create an account'
                             : 'Request an account'),
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 20),
+                      const Divider(),
+                      const SizedBox(height: 14),
                       const Text(
                         'Only approved operators can view FleetLuma monitoring data. '
                         'Agent credentials are separate from operator accounts.',
