@@ -29,6 +29,8 @@ jobs:
           dpkg-query --show fleetluma-agent
           test -x /usr/lib/fleetluma/fleetluma-agent
           test -x /usr/bin/fleetluma-control
+          test -x /usr/bin/fleetluma-setup
+          sh -n /usr/bin/fleetluma-setup
           test -f /lib/systemd/system/fleetluma-agent.service
           test -f /etc/fleetluma/agent.conf
           test "$(stat -c %a /var/lib/fleetluma)" = 700
@@ -62,6 +64,7 @@ jobs:
         run: |
           sudo dpkg --purge fleetluma-agent
           test ! -e /usr/bin/fleetluma-control
+          test ! -e /usr/bin/fleetluma-setup
           test ! -e /lib/systemd/system/fleetluma-agent.service
           test ! -e /etc/fleetluma/agent.conf
           test ! -e /var/lib/fleetluma/private/identity.bin
