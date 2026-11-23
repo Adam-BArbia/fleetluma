@@ -2,6 +2,8 @@
 import 'package:flutter/material.dart';
 
 import '../models/host_snapshot.dart';
+import '../data/fleet_api.dart';
+import 'web_host_history.dart';
 import '../state/fleet_controller.dart';
 
 // Web-only presentation dashboard. Uses the existing authenticated poller.
@@ -338,6 +340,12 @@ class WebFleetOverview extends StatelessWidget {
           const SizedBox(height: 8),
           Text('Received ' + elapsedLabel(m.receivedAt, DateTime.now()),
             style: const TextStyle(fontSize: 10, color: _muted)),
+          if (state.api is HttpFleetApi)
+            WebHostHistoryCharts(
+              key: ValueKey('history-' + host.id),
+              api: state.api as HttpFleetApi,
+              hostId: host.id,
+            ),
         ],
       ],
     ));
