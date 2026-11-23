@@ -16,7 +16,7 @@ jobs:
     steps:
       - name: Check cloud API health and operator authentication boundary
         env:
-          API_ORIGIN: https://fleetluma-fcl5krr39-fleet-luma.vercel.app
+          API_ORIGIN: https://fleetluma-api.vercel.app
         run: |
           python3 - <<'PY'
           import json
