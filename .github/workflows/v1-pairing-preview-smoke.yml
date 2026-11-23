@@ -1,0 +1,53 @@
+name: FleetLuma V1 pairing preview safety smoke
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/v1-pairing-preview-smoke.yml'
+permissions:
+  contents: read
+jobs:
+  probe-pairing-preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      API_ORIGIN: https://fleetluma-h2nlyfk1h-fleet-luma.vercel.app
+    steps:
+      - name: Fail closed on health and enrollment auth
+        run: |
+          python3 - <<'PY'
+          import os, json
+          from urllib.request import Request, build_opener, HTTPRedirectHandler, ProxyHandler
+          from urllib.error import HTTPError
+
+          class BlockRedirect(HTTPRedirectHandler):
+              def redirect_request(self, *args, **kwargs):
+                  return None
+          opener = build_opener(BlockRedirect(), ProxyHandler({}))
+          def probe(path):
+              req = Request(os.environ["API_ORIGIN"] + path,
+                            method="GET", headers={"Accept":"application/json"})
+              try:
+                  with opener.open(req, timeout=15) as r:
+                      return r.status, r.read(2048)
+              except HTTPError as e:
+                  return e.code, b""
+
+          status, body = probe("/health")
+          if status != 200:
+              raise SystemExit(f"FAIL: pairing preview /health HTTP {status}")
+          data = json.loads(body)
+          if data.get("status") != "ready" or data.get("mode") != "cloud":
+              raise SystemExit("FAIL: preview health not ready/cloud")
+          status, _ = probe("/api/v1/operator/workspaces")
+          if status != 401:
+              raise SystemExit(f"FAIL: operator workspace route must challenge 401, got {status}")
+          status, _ = probe("/api/v1/agent/pairings")
+          if status != 405:
+              raise SystemExit(f"FAIL: expected registered POST pairing route (GET 405), got {status}")
+          status, _ = probe("/api/v1/hosts")
+          if status not in (401, 403):
+              raise SystemExit(f"FAIL: host monitoring exposed without JWT (HTTP {status})")
+          print("PASS: pairing preview DB ready, routes enabled, operator routes locked")
+          PY
