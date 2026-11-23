@@ -61,8 +61,8 @@ class AgentSetupWindow:
         self._after_id = None
 
         master.title("FleetLuma · Agent Setup")
-        master.minsize(430, 450)
-        master.geometry("550x480")
+        master.minsize(430, 540)
+        master.geometry("550x570")
         master.configure(bg=BACKGROUND)
         master.protocol("WM_DELETE_WINDOW", self.close)
 
