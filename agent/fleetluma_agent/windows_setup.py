@@ -131,7 +131,7 @@ class AgentSetupWindow:
         # A fixed, trusted public operator URL; never open a link returned
         # from a pairing response or expose agent credentials to the browser.
         try:
-            webbrowser.open("https://fleetluma-web.vercel.app/devices/pair")
+            webbrowser.open("https://fleetluma-web.vercel.app")
         except Exception:
             self.feedback.configure(
                 text="Open https://fleetluma-web.vercel.app in your browser.")
