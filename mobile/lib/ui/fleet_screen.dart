@@ -152,7 +152,7 @@ class _FleetScreenState extends State<FleetScreen>
                             fontWeight: FontWeight.w800, fontSize: 12,
                             letterSpacing: 2, color: _subtle)),
                           const Spacer(),
-                          Text(state.hosts.length.toString() + ' machines',
+                          Text('${state.hosts.length} machines',
                               style: const TextStyle(color: _subtle,
                                                      fontSize: 12)),
                         ]),
