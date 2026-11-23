@@ -1,0 +1,137 @@
+name: FleetLuma Android compact installable demo APK
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/flutter-cloud-android-installable.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  build-verified-arm64-apk:
+    if: github.repository == 'Adam-BArbia/fleetluma' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: fleetluma-preview
+    timeout-minutes: 45
+    env:
+      FLEETLUMA_API_ORIGIN: https://fleetluma-api.vercel.app
+      FLEETLUMA_SUPABASE_URL: ${{ vars.FLEETLUMA_SUPABASE_URL }}
+      FLEETLUMA_SUPABASE_PUBLISHABLE_KEY: ${{ vars.FLEETLUMA_SUPABASE_PUBLISHABLE_KEY }}
+    steps:
+      - name: Ensure only reviewed public client values are used
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import os
+          from urllib.parse import urlsplit
+          api = urlsplit(os.getenv("FLEETLUMA_API_ORIGIN", ""))
+          db = urlsplit(os.getenv("FLEETLUMA_SUPABASE_URL", ""))
+          public = os.getenv("FLEETLUMA_SUPABASE_PUBLISHABLE_KEY", "")
+          if (api.scheme != "https" or api.hostname != "fleetluma-api.vercel.app"
+              or api.path or api.query or api.fragment or db.scheme != "https"
+              or not (db.hostname or "").endswith(".supabase.co")
+              or db.path or db.query or db.fragment or not public.startswith("sb_publishable_")):
+              raise SystemExit("Refusing demo APK build: invalid public cloud values")
+          print("Public HTTPS API/Supabase configuration verified")
+          PY
+      - name: Verify operator endpoint is protected
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from urllib.request import build_opener, Request, ProxyHandler, HTTPRedirectHandler
+          from urllib.error import HTTPError
+          class RejectRedirects(HTTPRedirectHandler):
+              def redirect_request(self, *args, **kwargs):
+                  return None
+          url = "https://fleetluma-api.vercel.app/api/v1/operator/workspaces"
+          try:
+              with build_opener(RejectRedirects(), ProxyHandler({})).open(
+                  Request(url, method="GET"), timeout=15
+              ) as result:
+                  status = result.status
+          except HTTPError as err:
+              status = err.code
+          if status != 401:
+              raise SystemExit(f"Unexpected operator authorization status {status}")
+          print("PASS: anonymous requests receive HTTP 401")
+          PY
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.50.0'
+          channel: stable
+          cache: true
+      - name: Generate Android files and run Flutter validation
+        shell: bash
+        working-directory: mobile
+        run: |
+          set -euo pipefail
+          flutter create --platforms=android --project-name fleetluma .
+          flutter pub get
+          flutter analyze
+          flutter test
+      - name: Build compact release-mode ARM64 APK with demo key
+        shell: bash
+        working-directory: mobile
+        run: |
+          set -euo pipefail
+          flutter build apk --release --target-platform android-arm64 \
+            --build-name=1.0.0 --build-number=2 \
+            --dart-define=FLEETLUMA_CLOUD_MODE=true \
+            --dart-define=FLEETLUMA_PAIRING_UI_ENABLED=true \
+            --dart-define=FLEETLUMA_API_BASE_URL="$FLEETLUMA_API_ORIGIN" \
+            --dart-define=FLEETLUMA_SUPABASE_URL="$FLEETLUMA_SUPABASE_URL" \
+            --dart-define=FLEETLUMA_SUPABASE_PUBLISHABLE_KEY="$FLEETLUMA_SUPABASE_PUBLISHABLE_KEY"
+          test -s build/app/outputs/flutter-apk/app-release.apk
+      - name: Verify APK signature, manifest and ARM64 binary
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk=mobile/build/app/outputs/flutter-apk/app-release.apk
+          build_tools="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
+          test -x "$build_tools/apksigner"
+          "$build_tools/apksigner" verify --verbose --min-sdk-version 24 "$apk"
+          "$build_tools/zipalign" -c -p 4 "$apk"
+          "$build_tools/aapt" dump badging "$apk" | grep -E "^package:|^sdkVersion:|^targetSdkVersion:|^native-code:" | head -n 8
+          "$build_tools/aapt" dump badging "$apk" | grep -q "name='com.example.fleetluma'"
+          unzip -Z -1 "$apk" | grep -q '^lib/arm64-v8a/libflutter\.so$'
+          if unzip -Z -1 "$apk" | grep -q '^lib/x86_64/'; then
+            echo "::error::Unexpected x86_64 binary in ARM64-only demo"
+            exit 1
+          fi
+          mkdir -p release-assets
+          cp "$apk" release-assets/FleetLuma-Android-ARM64-DEMO.apk
+          (cd release-assets && sha256sum FleetLuma-Android-ARM64-DEMO.apk > FleetLuma-Android-ARM64-DEMO.sha256)
+          ls -lh release-assets/
+      - name: Publish verified APK to GitHub Actions artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: fleetluma-android-arm64-installable-demo
+          path: release-assets/
+          retention-days: 14
+          if-no-files-found: error
+      - name: Add alternative APK to existing V1 classroom pre-release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag=v1-demo-2026-11-23
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            if gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json assets \
+              --jq '.assets[].name' | grep -Fxq 'FleetLuma-Android-ARM64-DEMO.apk'; then
+              echo "APK already attached, retaining existing immutable asset"
+            else
+              gh release upload "$tag" release-assets/FleetLuma-Android-ARM64-DEMO.apk \
+                release-assets/FleetLuma-Android-ARM64-DEMO.sha256 \
+                --repo "$GITHUB_REPOSITORY"
+            fi
+            gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json url,assets \
+              --jq '{url,assets:[.assets[].name]}'
+          else
+            echo "::warning::Classroom pre-release absent: APK remains in Actions artifact; no tag created automatically"
+          fi
