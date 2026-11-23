@@ -1,7 +1,9 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
 import '../models/host_snapshot.dart';
 import '../state/fleet_controller.dart';
+import 'web_fleet_overview.dart';
 
 const _mint = Color(0xFF55E5D3);
 const _navyCard = Color(0xFF111D30);
@@ -57,6 +59,13 @@ class _FleetScreenState extends State<FleetScreen>
       animation: widget.controller,
       builder: (context, _) {
         final state = widget.controller;
+        if (kIsWeb) {
+          return WebFleetOverview(
+            state: state,
+            onManageDevices: widget.onManageDevices,
+            onSignOut: widget.onSignOut,
+          );
+        }
         final desktop = MediaQuery.sizeOf(context).width >= 1050;
         return Scaffold(
           backgroundColor: const Color(0xFF080E1A),
