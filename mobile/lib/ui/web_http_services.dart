@@ -278,7 +278,10 @@ class _ServiceCardState extends State<_ServiceCard> {
   void didUpdateWidget(covariant _ServiceCard oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.service.id != widget.service.id ||
+        oldWidget.service.checkedAt != widget.service.checkedAt ||
         !identical(oldWidget.api, widget.api)) {
+      // Parent service polling supplies new check timestamps every minute.
+      // Refresh only when a newer persisted check exists; keep API reads bounded.
       _load();
     }
   }
