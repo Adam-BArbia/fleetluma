@@ -58,8 +58,8 @@ export async function probe(
 }
 
 /** Defense in depth: reject DNS answers in private/special-use IPv4 ranges.
- * IPv6 is conservatively denied for this demo. The DNS-to-connect race still
- * requires separate egress restrictions before internet-facing deployment.
+ * IPv6 addresses are never dialed by the IP-pinned HTTPS transport.
+ * All returned IPv4 addresses must be public.
  */
 export function isPublicIpv4(raw: string): boolean {
   const parts = raw.split(".");
@@ -84,11 +84,12 @@ export async function verifyPublicDns(
     async (hostname, family) => Deno.resolveDns(hostname, family),
 ): Promise<string> {
   // Fail closed if the resolver is disabled / cannot inspect addresses.
+  // Only IPv4 is used by the pinned TLS transport. An AAAA record is
+  // harmless because the request cannot connect to it.
   const ipv4 = await resolver(target.hostname, "A");
-  const ipv6 = await resolver(target.hostname, "AAAA");
-  if (ipv4.length === 0 || ipv6.length > 0 ||
+  if (ipv4.length === 0 ||
       ipv4.some((address) => !isPublicIpv4(address))) {
-    throw new Error("Public IPv4-only DNS verification failed");
+    throw new Error("Public IPv4 DNS verification failed");
   }
   // Return the verified IP. The TLS connection must not re-resolve the host.
   return ipv4[0];
