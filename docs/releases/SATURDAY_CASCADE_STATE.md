@@ -159,6 +159,16 @@
 - **After** user configures these non-secret variables: invoke one scoped authorized check only against the owned FleetLuma HTTPS health endpoint, confirm an actual persisted check and Edge Runtime IP-pinned TLS compatibility, then schedule narrow Cron with Vault key only if the real runtime check passes.
 - No credentials, personal login tokens, or raw Vault values are stored in GitHub or Jira.
 
+## FL-29 / FL-31 / FL-30: checker live activation successfully verified (Nov 25)
+- Supabase checker key `fleetluma_checker`, encrypted Vault secret `fleetluma_checker_api_key`, and non-secret Edge environment variables have been configured. Unauthorized call without `apikey` returned **401**, and an authorized but disabled worker returned **503**. A configured worker with zero enabled services returned `checked=0/skipped=0`.
+- Approved **only** `https://fleetluma-api.vercel.app/health` as enabled. The first attempted public probe revealed an over-strict dual-stack DNS policy; updated validation to allow AAAA records without ever connecting over IPv6. The subsequent Node HTTPS API failed during setup in the hosted Edge Runtime. Kept the genuine failures in `service_checks` as `UNHEALTHY` rather than inventing healthy measurements.
+- Replaced Node HTTPS with native Deno TLS using `Deno.connect` pinned to a verified public IPv4 and `Deno.startTls` using the original approved hostname for TLS SNI and certificate verification. No redirect following, untrusted URL/IP, credentials in HTTP request or second hostname DNS lookup. Function **v12** deployed.
+- **Real manual probe succeeded:** 2026-11-25 **14:58:19 UTC**, persisted `HEALTHY / HTTP 200 / 335.51ms / failure_kind=none`.
+- **Cron enabled:** job **2**, `fleetluma-checker-1m`, `* * * * *`, calls only the named-key-restricted function with its key sourced at runtime from Vault, not in job command literals. **First automatic Cron execution succeeded** at 14:59 UTC; new persisted **14:59:01 UTC HEALTHY / HTTP 200 / 276.61ms** confirms recurring invocation actually ran.
+- Independent FL-36 retention Cron continues job 1 every 15m; both jobs have separate rollback paths. All checker checks retain real timestamps and failure history.
+- Current operational runbook and rollback SQL: `docs/deployment/FL-29_ACTIVE_CHECKER_RUNBOOK.md`; reconciled activation record: `docs/deployment/SATURDAY_HTTP_CHECKER_ACTIVATION.md`. Jira FL-29/30/31 updated with evidence.
+- **Not yet released:** Web status/latency panel must be validated under actual Supabase-authenticated workspace on the coordinated Web/API release. Android build/user physical test and production promotion are separate final gates. The native transport used in Edge v12 has been exercised live; exact-head CI for the newest docs changes must be checked before merge.
+
 ## Explicit deferrals
 - General process termination/kill and remote command execution are NOT in Saturday release. A safe proof of concept would need a separate narrowly authorized command architecture and agent changes.
 - Native PDF exports and public signup are NOT in Saturday release.
