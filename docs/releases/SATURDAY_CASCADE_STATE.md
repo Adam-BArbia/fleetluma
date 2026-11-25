@@ -128,6 +128,11 @@
 - Retention excludes host records and agent pairing state; the integrated production Web/API and installed APK have not been promoted. Rollback job only: `SELECT cron.unschedule('fleetluma-history-retention-15m');`. This does not restore previously expired rows.
 - Source files: `backend/sql/FL-36_history_retention_function.sql`, `backend/sql/FL-36_history_retention_schedule.sql`, `backend/tests/test_retention_postgres_integration.py`.
 
+## Verified deployed FastAPI health (Nov 25)
+- Used the connected Vercel deployment fetcher to request `/health` on **both** the current production alias `https://fleetluma-api.vercel.app/health` and the isolated API preview `https://fleetluma-42yd3zu4g-fleet-luma.vercel.app/health`. Both returned HTTP 200 with JSON `{"status":"ready","mode":"cloud"}`.
+- Attempts to fetch protected host/service endpoints without authentication could not complete: Vercel's preview share-link authentication blocked the requests at `fetch_deployment` with `deployment_authentication_required`. **This is not proof that the FastAPI authorization layer returned 401**; test authenticated and unauthenticated API access independently in the final acceptance sequence.
+- No production promotion, alias updates or Android installation performed.
+
 ## Explicit deferrals
 - General process termination/kill and remote command execution are NOT in Saturday release. A safe proof of concept would need a separate narrowly authorized command architecture and agent changes.
 - Native PDF exports and public signup are NOT in Saturday release.
