@@ -1,5 +1,8 @@
 import { assertEquals, assertRejects, assertThrows } from "jsr:@std/assert@1.0.10";
-import { allowedTarget, probe, isPublicIpv4, verifyPublicDns } from "./checker.ts";
+import { allowedTarget, probe, probePinned, isPublicIpv4, verifyPublicDns } from "./checker.ts";
+import { EventEmitter } from "node:events";
+import type { ClientRequest } from "node:http";
+import type { RequestOptions } from "node:https";
 
 const allowed = new Set(["status.example.test"]);
 
@@ -69,10 +72,63 @@ Deno.test("Private, metadata and special IPv4 addresses are rejected", () => {
 
 Deno.test("Public DNS verification rejects private and IPv6 answers", async () => {
   const target = allowedTarget("https://status.example.test/", allowed);
-  await verifyPublicDns(target, async (_hostname, family) =>
-    family === "A" ? ["8.8.8.8"] : []);
+  assertEquals(await verifyPublicDns(target, async (_hostname, family) =>
+    family === "A" ? ["8.8.8.8"] : []), "8.8.8.8");
   await assertRejects(() => verifyPublicDns(target, async (_hostname, family) =>
     family === "A" ? ["127.0.0.1"] : []));
   await assertRejects(() => verifyPublicDns(target, async (_hostname, family) =>
     family === "A" ? ["8.8.8.8"] : ["::1"]));
+});
+
+
+Deno.test("IP-pinned TLS requires a verified public address before constructing request", async () => {
+  let invoked = false;
+  const fake = (() => {
+    invoked = true;
+    throw new Error("requester must not be invoked");
+  }) as unknown as Parameters<typeof probePinned>[3];
+  await assertRejects(() =>
+    probePinned("https://status.example.test/health", allowed, "127.0.0.1", fake));
+  assertEquals(invoked, false);
+});
+
+Deno.test("TLS request uses exactly the verified IP and preserves HTTPS hostname checks", async () => {
+  let options: RequestOptions | undefined;
+  const mock = ((opts: RequestOptions, callback: (response: unknown) => void) => {
+    options = opts;
+    const request = new EventEmitter() as ClientRequest;
+    const socket = new EventEmitter() as unknown as ClientRequest["socket"];
+    Object.defineProperty(socket, "remoteAddress", { value: "8.8.8.8" });
+    request.end = (() => {
+      request.emit("socket", socket);
+      socket.emit("connect");
+      const response = {
+        statusCode: 204,
+        destroy() { /* no response body consumed */ },
+      };
+      callback(response);
+      return request;
+    }) as typeof request.end;
+    request.destroy = (() => request) as typeof request.destroy;
+    return request;
+  }) as unknown as Parameters<typeof probePinned>[3];
+  const result = await probePinned(
+    "https://status.example.test/health", allowed, "8.8.8.8", mock);
+  assertEquals(result.status, "HEALTHY");
+  assertEquals(result.http_code, 204);
+  assertEquals(options?.hostname, "status.example.test");
+  assertEquals(options?.servername, "status.example.test");
+  assertEquals(options?.port, 443);
+  assertEquals(options?.rejectUnauthorized, true);
+  assertEquals(options?.agent, false);
+  assertEquals(options?.method, "GET");
+  assertEquals(options?.path, "/health");
+  assertEquals(options?.headers?.["Host"], "status.example.test");
+  const lookup = options?.lookup;
+  if (typeof lookup !== "function") throw new Error("IP-pinning lookup missing");
+  let resolved = "";
+  lookup("status.example.test", {}, (_err, ip) => {
+    resolved = ip as string;
+  });
+  assertEquals(resolved, "8.8.8.8");
 });
