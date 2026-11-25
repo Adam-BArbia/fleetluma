@@ -9,12 +9,12 @@ const respond = (status: number, body: object) =>
   });
 
 // Service-to-service caller authentication is enforced by the Supabase
-// wrapper: ONLY the named secret key "fleetluma-checker" can call this worker.
+// wrapper: ONLY the named secret key "fleetluma_checker" can call this worker.
 // Hosted configuration MUST set verify_jwt=false for apikey-secret mode.
 // The secret is supplied on apikey, never in the function source or URL.
 // No anonymous access: auth:'secret:<name>' fails closed before this handler.
 export default {
-  fetch: withSupabase({ auth: "secret:fleetluma-checker" }, async (request) => {
+  fetch: withSupabase({ auth: "secret:fleetluma_checker" }, async (request) => {
     if (request.method !== "POST") {
       return respond(405, { error: "Method not allowed" });
     }
