@@ -74,6 +74,51 @@ async function checkFirstFrame(browser, name, iteration) {
   }
 }
 
+async function checkWarmReloads(browser, name) {
+  // Unlike fresh launches, this deliberately reuses an ordinary browser
+  // profile with cache and service workers ENABLED. It catches cache-related
+  // blank pages that isolated service-worker-blocked contexts cannot catch.
+  const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+  await context.addInitScript(() => {
+    window.__fleetlumaFirstFrameObserved = false;
+    window.addEventListener('flutter-first-frame', () => {
+      window.__fleetlumaFirstFrameObserved = true;
+    }, { once: true });
+  });
+  const page = await context.newPage();
+  const events = [];
+  page.on('pageerror', e => events.push({ type: 'pageerror', error: String(e).slice(0, 240) }));
+  page.on('response', response => {
+    const pathname = new URL(response.url()).pathname;
+    if (/\.(?:js|wasm)$/.test(pathname) && response.status() >= 400) {
+      events.push({ type: 'asset', status: response.status(), path: pathname });
+    }
+  });
+  try {
+    for (let iteration = 1; iteration <= 4; iteration++) {
+      if (iteration === 1) {
+        await page.goto(BASE_URL, { waitUntil: 'domcontentloaded', timeout: 20000 });
+      } else {
+        await page.reload({ waitUntil: 'domcontentloaded', timeout: 20000 });
+      }
+      await page.waitForFunction(() =>
+        window.__fleetlumaFirstFrameObserved === true &&
+        document.getElementById('fleetluma-boot')?.hidden === true &&
+        document.querySelector('flutter-view, flt-glass-pane') !== null,
+        null, { timeout: 45000 });
+      if (events.length > 0) {
+        throw new Error('Warm reload triggered a Javascript or asset error');
+      }
+      process.stdout.write(`PASS ${name} warm-cache first-frame ${iteration}/4\n`);
+    }
+  } catch (error) {
+    await capture(page, name, 'warm-cache', error, events);
+    throw error;
+  } finally {
+    await context.close();
+  }
+}
+
 async function checkScriptRecovery(browser, name) {
   const context = await browser.newContext({ serviceWorkers: 'block' });
   const page = await context.newPage();
@@ -103,12 +148,13 @@ async function checkScriptRecovery(browser, name) {
       for (let attempt = 1; attempt <= 5; attempt++) {
         await checkFirstFrame(browser, name, attempt);
       }
+      await checkWarmReloads(browser, name);
       await checkScriptRecovery(browser, name);
     } finally {
       await browser.close();
     }
   }
-  console.log('PASS: 10 fresh Chromium/Firefox loads, reloads, and broken-bootstrap recovery');
+  console.log('PASS: 10 fresh + 8 cache-enabled Chromium/Firefox starts, and broken-bootstrap recovery');
 })().catch(error => {
   console.error('FL-22 browser startup regression FAILED:', error.message);
   process.exitCode = 1;
