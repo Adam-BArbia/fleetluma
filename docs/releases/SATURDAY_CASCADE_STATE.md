@@ -111,6 +111,14 @@
 - Latest source with these fixes: `5a51ceb6e2e03bf0e9845cee35e06ae08dca2b2a`. Browser smoke, backend, checker, PostgreSQL integration, PlantUML, preview contract, and Flutter Web CI passed on that commit; Android and cloud candidate jobs must be checked separately before final sign-off.
 - Non-production integrated FastAPI preview deployment for prior source SHA `6a82de9834a31bef6fe05a10affeb915214e339b` is READY at `https://fleetluma-42yd3zu4g-fleet-luma.vercel.app`. Preview runtime authentication/health still needs accepted browser verification; production API alias remains unchanged.
 
+## Reliability hardening — cache-enabled reloads (2026-11-25)
+- The `main`-equivalent integrated source at `2e05b6c92f128920037daaa3e2b882d43ef7c2b1` passed **all nine GitHub Actions workflows**, including real-browser Chromium/Firefox cold starts and recovery, backend, PostgreSQL, Android, Web, cloud artifacts, checker and UML.
+- Added `checkWarmReloads` to `.github/scripts/web_boot_smoke.cjs`: two browser families, four normal-cache/service-worker-enabled loads each, assert Flutter first frame and hidden loader, capture screenshot and console/failed asset diagnostics on errors.
+- GitHub Actions browser-smoke run `45604522671` **passed** for code commit `13e52220e3bedf4cd96f6b8c6e1f85af2903a782`; this supplements the ten fresh private-context launches with eight warm-cache checks (18 total starts plus reload/recovery cases).
+- Same commit also passed backend, PostgreSQL, checker, Web and UML workflows; cloud APK and mobile tests were still being finalized at the time of this entry. Do not treat previous successful builds as confirmation of a later commit.
+- These headless browser tests use a local static build with no real operator login. They **do not replace** the user's final real Web+Android session or prove that protected deployed preview routes are accessible.
+- Critical remaining cloud dependencies unchanged: dedicated named Supabase checker key in Vault, approved outbound egress/DNS-to-connect safety, real persisted HTTP checks, optional alert enablement decision and final user acceptance.
+
 ## Explicit deferrals
 - General process termination/kill and remote command execution are NOT in Saturday release. A safe proof of concept would need a separate narrowly authorized command architecture and agent changes.
 - Native PDF exports and public signup are NOT in Saturday release.
