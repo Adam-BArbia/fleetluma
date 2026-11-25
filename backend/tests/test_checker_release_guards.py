@@ -32,6 +32,17 @@ def test_probe_cannot_activate_without_explicit_approval_flags():
     assert "enabled=true" in source
     assert "verifyPublicDns(target)" in source
     assert "allowedTarget(service.url, allowed)" in source
+    assert "probePinned(service.url, allowed, verifiedIp)" in source
+    assert "const verifiedIp = await verifyPublicDns(target)" in source
+    assert "await probe(service.url" not in source
+    checker = (PROJECT / "supabase" / "functions" /
+               "fleetluma-checker" / "checker.ts").read_text(encoding="utf-8")
+    assert "rejectUnauthorized: true" in checker
+    assert "serverName:" not in checker
+    assert "servername: url.hostname" in checker
+    assert "callback(null, verifiedIp, 4)" in checker
+    assert "socket.remoteAddress !== verifiedIp" in checker
+
 
 
 def test_cron_is_a_review_template_and_not_an_active_sql_migration():
