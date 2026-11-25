@@ -37,7 +37,8 @@ export async function probe(
       signal: AbortSignal.timeout(4000),
       headers: { "User-Agent": "FleetLuma-Checker/0.1" },
     });
-    const healthy = response.status >= 200 && response.status < 400;
+    // Redirects are deliberately not followed and never imply a healthy service.
+    const healthy = response.status >= 200 && response.status < 300;
     await response.body?.cancel();
     return {
       checked_at, status: healthy ? "HEALTHY" : "UNHEALTHY",
