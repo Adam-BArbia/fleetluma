@@ -68,7 +68,9 @@ def test_real_agent_report_alert_lifecycle_and_workspace_permissions(monkeypatch
         rules.list_rules(outsider, workspace)
     with pytest.raises(PermissionError):
         rules.edit_rule(viewer, cpu["id"], RuleEdit(threshold_pct=90))
-    with pytest.raises(PermissionError):
+    # A non-member must not learn whether an arbitrary rule ID exists:
+    # the scoped lookup deliberately returns 404 / KeyError.
+    with pytest.raises(KeyError):
         rules.archive_rule(outsider, cpu["id"])
 
     def report(cpu_pct, ram_used, disk_used=10):
