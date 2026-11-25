@@ -133,6 +133,11 @@
 - Attempts to fetch protected host/service endpoints without authentication could not complete: Vercel's preview share-link authentication blocked the requests at `fetch_deployment` with `deployment_authentication_required`. **This is not proof that the FastAPI authorization layer returned 401**; test authenticated and unauthenticated API access independently in the final acceptance sequence.
 - No production promotion, alias updates or Android installation performed.
 
+## FL-36 — automatic retention actually executed
+- PostgreSQL `cron.job_run_details` recorded the **first automatic** `fleetluma-history-retention-15m` job as `succeeded`: `2026-11-25 13:30:00 UTC`, finished about 4 milliseconds later, result `1 row`.
+- Following the scheduled execution, a scoped query returned **0 expired samples**. This independently proves background Cron execution in addition to the manually triggered initial cleanup.
+- Jira FL-36 contains before/after counts, rollout, privileges, CI and successful Cron evidence. The separate HTTP checker remains without scheduled jobs and without user-provided named key.
+
 ## Explicit deferrals
 - General process termination/kill and remote command execution are NOT in Saturday release. A safe proof of concept would need a separate narrowly authorized command architecture and agent changes.
 - Native PDF exports and public signup are NOT in Saturday release.
