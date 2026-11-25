@@ -1,6 +1,6 @@
 # The FleetLuma scheduled checker is a service-to-service endpoint.
 # Gateway JWT verification must be disabled ONLY because @supabase/server
-# withSupabase({ auth: 'secret:fleetluma-checker' }) verifies the named
+# withSupabase({ auth: 'secret:fleetluma_checker' }) verifies the named
 # secret API key on the 'apikey' header before the handler is invoked.
 # Do not change its wrapper to auth:'none' or a publishable key.
 [functions.fleetluma-checker]
