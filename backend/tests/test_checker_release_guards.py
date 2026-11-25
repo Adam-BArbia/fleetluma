@@ -19,7 +19,7 @@ def test_checker_gateway_is_never_open_without_named_key_auth():
     checker = config["functions"]["fleetluma-checker"]
     source = CHECKER.read_text(encoding="utf-8")
     assert checker["verify_jwt"] is False
-    assert 'withSupabase({ auth: "secret:fleetluma-checker" }' in source
+    assert 'withSupabase({ auth: "secret:fleetluma_checker" }' in source
     assert 'auth: "none"' not in source
     assert 'auth: "publishable"' not in source
 
