@@ -24,7 +24,7 @@ String makeHostHistoryCsv({
     ];
     lines.add(row.map(safeCsvField).join(','));
   }
-  return '\uFEFF' + lines.join('\r\n') + '\r\n';
+  return '\uFEFF${lines.join('\r\n')}\r\n';
 }
 
 /// Quoting alone does not neutralize spreadsheet formula injection.
