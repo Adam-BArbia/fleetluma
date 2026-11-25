@@ -59,7 +59,14 @@ CREATE TABLE IF NOT EXISTS fleetluma.incident_events (
 );
 CREATE INDEX IF NOT EXISTS fl_incident_events_incident ON fleetluma.incident_events(incident_id,created_at);
 
--- All tables remain exclusively in the private fleetluma schema.
--- The app's restricted backend role must be granted only the required CRUD;
--- do not grant the public anon or authenticated PostgREST roles access.
+-- Defence in depth even if the private schema is accidentally exposed later.
+ALTER TABLE fleetluma.alert_rules ENABLE ROW LEVEL SECURITY;
+ALTER TABLE fleetluma.alert_rule_state ENABLE ROW LEVEL SECURITY;
+ALTER TABLE fleetluma.incidents ENABLE ROW LEVEL SECURITY;
+ALTER TABLE fleetluma.incident_events ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON ALL TABLES IN SCHEMA fleetluma FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON ALL SEQUENCES IN SCHEMA fleetluma FROM PUBLIC, anon, authenticated;
+
+-- Do not grant public PostgREST permissions to these private tables.
+-- Review grants for the existing restricted application database role before activation.
 COMMIT;
