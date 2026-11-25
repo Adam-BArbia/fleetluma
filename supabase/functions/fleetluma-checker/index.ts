@@ -37,6 +37,7 @@ export default {
     let checked = 0;
     let skipped = 0;
     const skippedByStage = { dns: 0, probe: 0, database: 0 };
+    const networkDiagnostics: Record<string, number> = {};
     for (const service of services) {
       let stage: keyof typeof skippedByStage = "dns";
       try {
@@ -45,6 +46,10 @@ export default {
         // IP-pinned HTTPS with original hostname SNI + cert verification.
         stage = "probe";
         const result = await probePinned(service.url, allowed, verifiedIp);
+        if (result.diagnostic_code) {
+          networkDiagnostics[result.diagnostic_code] =
+            (networkDiagnostics[result.diagnostic_code] ?? 0) + 1;
+        }
         stage = "database";
         await sql`INSERT INTO fleetluma.service_checks
           (service_id, checked_at, status, http_code, latency_ms, failure_kind)
@@ -60,7 +65,7 @@ export default {
     }
     // FL-36: independent pg_cron retention runs without a network request.
     // Do not couple retention to the optional HTTP checker lifecycle.
-    return respond(200, { checked, skipped, skippedByStage });
+    return respond(200, { checked, skipped, skippedByStage, networkDiagnostics });
   } catch (_err) {
     return respond(500, { error: "Scheduled checker unavailable" });
   } finally {
