@@ -119,6 +119,15 @@
 - These headless browser tests use a local static build with no real operator login. They **do not replace** the user's final real Web+Android session or prove that protected deployed preview routes are accessible.
 - Critical remaining cloud dependencies unchanged: dedicated named Supabase checker key in Vault, approved outbound egress/DNS-to-connect safety, real persisted HTTP checks, optional alert enablement decision and final user acceptance.
 
+## FL-36 — independent 24-hour data retention now active (Nov 25)
+- Live FleetLuma telemetry audit before cleanup: 7,912 samples, of which 4,269 exceeded 24 hours; checker monitoring rows = 0. The original retention depended on the disabled optional HTTP Edge checker, so stale telemetry had accumulated.
+- Added private SECURITY INVOKER PostgreSQL function `fleetluma.prune_expired_history()` and approved additive migration `fleetluma_fl36_private_history_pruner`, plus 15-minute Cron job `fleetluma-history-retention-15m` via migration `fleetluma_fl36_retention_cron_15m`. No HTTP calls or checker secrets.
+- The isolated PostgreSQL CI test initially failed because its new fixture omitted the post-FL-32 workspace_id constraint; fixed in commit `b65728058103928118bd9f02773709270635a60f`. PostgreSQL integration CI **passed** in run `45614419345`.
+- First live execution of the pruner returned `samples_deleted=4269`, `checks_deleted=0`. Verified Cron job id 1 active with schedule `*/15 * * * *`, 3,645 remaining samples immediately after first cleanup with a one-sample rolling expiration at the query boundary. The rolling time boundary can allow a few samples to reach 24h before the next 15-minute cleanup.
+- Confirmed the function is **not executable** by `anon` or `authenticated` and zero jobs named `fleetluma-checker%`; the optional HTTP probing security gate is unchanged.
+- Retention excludes host records and agent pairing state; the integrated production Web/API and installed APK have not been promoted. Rollback job only: `SELECT cron.unschedule('fleetluma-history-retention-15m');`. This does not restore previously expired rows.
+- Source files: `backend/sql/FL-36_history_retention_function.sql`, `backend/sql/FL-36_history_retention_schedule.sql`, `backend/tests/test_retention_postgres_integration.py`.
+
 ## Explicit deferrals
 - General process termination/kill and remote command execution are NOT in Saturday release. A safe proof of concept would need a separate narrowly authorized command architecture and agent changes.
 - Native PDF exports and public signup are NOT in Saturday release.
