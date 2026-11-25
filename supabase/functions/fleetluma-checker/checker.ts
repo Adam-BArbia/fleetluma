@@ -156,7 +156,7 @@ export async function probePinned(
         },
         lookup: (hostname, _options, callback) => {
           if (hostname.toLowerCase() !== url.hostname) {
-            callback(new Error("Unapproved DNS hostname"));
+            callback(new Error("Unapproved DNS hostname"), "", 4);
             return;
           }
           callback(null, verifiedIp, 4);
