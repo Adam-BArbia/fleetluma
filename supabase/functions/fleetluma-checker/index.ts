@@ -1,7 +1,8 @@
 /** FL-19: restricted Supabase Edge Function invoked by named-key Cron only. */
 import { withSupabase } from "npm:@supabase/server@1.9.2";
 import postgres from "npm:postgres@3.4.7";
-import { allowedTarget, probePinned, verifyPublicDns } from "./checker.ts";
+import { allowedTarget, verifyPublicDns } from "./checker.ts";
+import { probePinnedNative } from "./deno_probe.ts";
 
 const respond = (status: number, body: object) =>
   new Response(JSON.stringify(body), {
@@ -45,7 +46,7 @@ export default {
         const verifiedIp = await verifyPublicDns(target);
         // IP-pinned HTTPS with original hostname SNI + cert verification.
         stage = "probe";
-        const result = await probePinned(service.url, allowed, verifiedIp);
+        const result = await probePinnedNative(service.url, allowed, verifiedIp);
         if (result.diagnostic_code) {
           networkDiagnostics[result.diagnostic_code] =
             (networkDiagnostics[result.diagnostic_code] ?? 0) + 1;
