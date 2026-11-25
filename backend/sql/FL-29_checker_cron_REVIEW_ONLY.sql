@@ -1,52 +1,53 @@
--- FleetLuma HTTP checker: MANUAL REVIEW TEMPLATE, NOT AUTOMATICALLY APPLIED.
--- This is *not* a migration; do not add to production startup or migrations.
--- Preconditions: approved DNS/egress strategy, tested legacy JWT-compatible
--- service authorization, separate >=32-character Cron shared secret, and
--- Vault + pg_net + pg_cron installed by an authorized administrator.
+-- FleetLuma HTTP checker: REVIEW-ONLY reference, NOT an automatic migration.
+-- No Cron job is scheduled by this file. Only the preflight DO block runs if
+-- manually executed. Never paste secret values into SQL or GitHub.
 --
--- In Supabase Vault, provision by dashboard WITHOUT printing values:
--- fleetluma_checker_gateway_jwt  -- JWT-compatible Bearer credential
--- fleetluma_checker_cron_secret  -- identical to FLEETLUMA_CRON_SECRET in Edge
--- The worker MUST have FLEETLUMA_PUBLIC_PROBES_ENABLED=true and exact
--- FLEETLUMA_CHECK_ALLOWED_HOSTS set separately. Never commit their values.
+-- Designed for Supabase Edge Function source with
+-- withSupabase({auth:'secret:fleetluma-checker'}) and verify_jwt=false,
+-- NOT the older JWT + x-fleetluma-cron protocol still deployed as v2.
 --
--- WARNING: Supabase pg_net temporarily stores headers in the internal
--- request queue in decrypted form. Privileged DB users can read them.
--- Prefer the latest Supabase 'auth: secret' scheme after reviewing migration
--- from the currently deployed verify_jwt=true protocol.
+-- 1. In FleetLuma Supabase Settings > API Keys, create a NAMED secret API key
+--    named 'fleetluma-checker'. The secret MUST stay server-side.
+-- 2. Store this one key using the Supabase Vault UI under the name
+--    'fleetluma_checker_api_key'. The Cron caller sends it in 'apikey'.
+-- 3. The function must deploy with the named-key guard and gateway
+--    verify_jwt=false. Without the guard the endpoint would be public.
+-- 4. Set FLEETLUMA_CHECK_ALLOWED_HOSTS to the exact approved hostname
+--    fleetluma-api.vercel.app and FLEETLUMA_PUBLIC_PROBES_ENABLED=true
+--    only after egress/DNS preflight and a successful one-off check.
+-- 5. Independently verify the named key using one authorized request.
+--
+-- IMPORTANT: pg_net stores outgoing HTTP headers in an internal queue,
+-- potentially visible to privileged database roles. Protect those roles.
+-- The DNS-to-connect race needs a reviewed egress policy before activation.
 
+-- Guarded readiness check. Does NOT create a Cron job.
 DO $preflight$
-DECLARE jwt_len int;
-DECLARE shared_len int;
+DECLARE configured_key text;
 BEGIN
   IF to_regclass('cron.job') IS NULL OR
      to_regclass('vault.decrypted_secrets') IS NULL THEN
-    RAISE EXCEPTION 'FleetLuma checker: missing trusted Cron/Vault setup';
+    RAISE EXCEPTION 'FleetLuma checker: Cron or Vault is not configured';
   END IF;
-  SELECT length(decrypted_secret) INTO jwt_len
+  SELECT decrypted_secret INTO configured_key
     FROM vault.decrypted_secrets
-    WHERE name='fleetluma_checker_gateway_jwt';
-  SELECT length(decrypted_secret) INTO shared_len
-    FROM vault.decrypted_secrets
-    WHERE name='fleetluma_checker_cron_secret';
-  IF coalesce(jwt_len,0) < 32 OR coalesce(shared_len,0) < 32 THEN
-    RAISE EXCEPTION 'FleetLuma checker: required Vault credentials absent';
+    WHERE name='fleetluma_checker_api_key';
+  IF configured_key IS NULL OR
+     left(configured_key,10) <> 'sb_secret_' OR
+     length(configured_key) < 32 THEN
+    RAISE EXCEPTION 'FleetLuma checker: named API key absent in Vault';
   END IF;
   IF NOT EXISTS (
     SELECT 1 FROM fleetluma.services
     WHERE enabled=true
       AND url='https://fleetluma-api.vercel.app/health'
   ) THEN
-    RAISE EXCEPTION 'FleetLuma checker: approved service not enabled';
+    RAISE EXCEPTION 'FleetLuma checker: approved service is disabled';
   END IF;
 END
 $preflight$;
 
--- After a successful one-off authenticated HTTP test and DB persisted sample,
--- run this statement to create an ACTIVE once-per-minute Cron schedule.
--- The job should be removed/disabled immediately after final testing if
--- secrets, DNS, or egress policy is not secure.
---
+-- REVIEW-ONLY: after one verified check row, uncomment and execute.
 -- SELECT cron.schedule(
 --   'fleetluma-checker-1m',
 --   '* * * * *',
@@ -55,15 +56,10 @@ $preflight$;
 --       url := 'https://mulsyhgdigonccziywet.supabase.co/functions/v1/fleetluma-checker',
 --       headers := jsonb_build_object(
 --         'Content-Type', 'application/json',
---         'Authorization', 'Bearer ' || (
+--         'apikey', (
 --           SELECT decrypted_secret
 --           FROM vault.decrypted_secrets
---           WHERE name='fleetluma_checker_gateway_jwt'
---         ),
---         'x-fleetluma-cron', (
---           SELECT decrypted_secret
---           FROM vault.decrypted_secrets
---           WHERE name='fleetluma_checker_cron_secret'
+--           WHERE name='fleetluma_checker_api_key'
 --         )
 --       ),
 --       body := '{"source":"fleetluma-cron"}'::jsonb,
@@ -72,5 +68,5 @@ $preflight$;
 --   $FL_JOB$
 -- );
 --
--- Roll back a job without deleting checks:
+-- Roll back this job without removing recorded measurements:
 -- SELECT cron.unschedule('fleetluma-checker-1m');
