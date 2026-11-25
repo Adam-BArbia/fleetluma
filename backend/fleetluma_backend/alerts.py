@@ -54,8 +54,16 @@ def evaluate_host_report(cur, host_id, metrics, received_at):
       ORDER BY id FOR UPDATE
     """, (host_id,))
     rules = cur.fetchall()
+    # Incoming agent report contains CPU% plus RAM/disk byte totals.
+    # Derive percentages from validated positive totals; do not expect
+    # ram_pct/disk_pct fields in the agent contract.
+    pct = {
+        "cpu_pct": float(metrics["cpu_pct"]),
+        "ram_pct": 100.0 * metrics["ram_used_bytes"] / metrics["ram_total_bytes"],
+        "disk_pct": 100.0 * metrics["disk_used_bytes"] / metrics["disk_total_bytes"],
+    }
     for rule in rules:
-        value = float(metrics[rule["metric"]])
+        value = round(pct[rule["metric"]], 2)
         cur.execute("""SELECT consecutive_breaches
                        FROM fleetluma.alert_rule_state WHERE rule_id=%s
                        FOR UPDATE""", (rule["id"],))
