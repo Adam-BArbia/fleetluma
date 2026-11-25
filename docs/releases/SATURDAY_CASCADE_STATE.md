@@ -52,6 +52,15 @@
 - One deliberately disabled API health target and Edge checker v2 are provisioned; no scheduled traffic or fabricated HTTP health samples.
 - Latest integrated source before this checkpoint: `87de016ff1feb97a907e3f98e047ba3ce09c910d`. Automated checks must pass for the next final source commit before production promotion.
 
+## Implementation update - real alert lifecycle verification and scheduler handoff
+- Added `backend/tests/test_alerts_postgres_integration.py` to exercise optional alert-rule CRUD and incident lifecycle against a **disposable PostgreSQL 17** server seeded with synthetic auth/workspace/agent identities.
+- Updated `.github/workflows/postgres-integration.yml` to apply `FL-40_alert_rules.sql` in CI **only**, then verify live Postgres alert creation, acknowledgement, automatic resolution, event audit, duplicate prevention, viewer/outsider boundaries and revoked-agent rejection.
+- Fixed the integration test's outsider case to demand privacy-preserving **404/KeyError** rather than revealing the existence of a different workspace's rule with 403.
+- GitHub Actions `PostgreSQL integration (FL-15)` **passed** on commit `192f997934a4e38ddfb55d79447445302236351a`, including the new optional alert migration and scenario. The alert migration is **not** applied to the live FleetLuma Supabase database.
+- Prepared `backend/sql/FL-29_checker_cron_REVIEW_ONLY.sql`: a commented-out Cron invocation template plus fail-closed Vault/extension preflight. **NOT executed.** Cloud checker remains intentionally disabled and target `enabled=false`.
+- Updated `docs/deployment/SATURDAY_HTTP_CHECKER_ACTIVATION.md` to reflect Edge Function v2 and current Supabase JWT-vs-secret-key authentication differences. Do not schedule `pg_net` until gateway/secret compatibility and DNS-to-connect egress controls are verified.
+- Latest branch as of this record: `2eb447a9a453a8e244a9ddfaa087d6d426f5fe2d`; automated CI still running for this exact commit.
+
 ## Explicit deferrals
 - General process termination/kill and remote command execution are NOT in Saturday release. A safe proof of concept would need a separate narrowly authorized command architecture and agent changes.
 - Native PDF exports and public signup are NOT in Saturday release.
