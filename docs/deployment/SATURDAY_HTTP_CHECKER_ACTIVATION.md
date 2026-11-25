@@ -5,7 +5,7 @@
 ## Current confirmed deployment
 
 - Supabase project: `mulsyhgdigonccziywet` (FleetLuma only).
-- Edge Function: `fleetluma-checker`, **version 3**, deployed with `verify_jwt=false` because the function itself uses `withSupabase({auth:'secret:fleetluma-checker'})`. This is **not** an anonymous API: the named secret key must be accepted by the Supabase wrapper before the handler executes.
+- Edge Function: `fleetluma-checker`, **version 4**, deployed with `verify_jwt=false` because the function itself uses `withSupabase({auth:'secret:fleetluma-checker'})`. This is **not** an anonymous API: the named secret key must be accepted by the Supabase wrapper before the handler executes.
 - `fleetluma.services`: one operator-owned approved target `https://fleetluma-api.vercel.app/health`, with **enabled=false**.
 - `fleetluma.service_checks`: zero recorded checks at the last verified inspection.
 - No scheduled job, Cron credentials, named secret API key or outbound-probe activation has been confirmed. Extensions **pg_cron 1.6.4**, **pg_net 0.20.4**, and **supabase_vault 0.3.2** are now installed. Vault existed before; pg_cron and pg_net were installed via the reviewed additive migration `fleetluma_fl29_scheduler_extensions_only`. Explicit verification found **zero FleetLuma Cron jobs**.
@@ -22,14 +22,16 @@ With `verify_jwt=false`, the gateway alone does *not* authenticate calls. The wr
 
 ## Network security blocker
 
-The source enforces exact approved HTTPS hostnames, no URL credentials/ports/query parameters, no redirect following, a 4-second timeout, and a public IPv4-only DNS precheck. **Pre-resolving DNS and subsequently calling `fetch(url)` does not pin the connection to that address.** Without an outbound-network policy that prevents DNS rebinding to internal, local or metadata addresses, the checker must **not** be activated as a general URL monitoring feature. Do not turn off DNS checks to fix a deployment failure.
+The source enforces exact approved HTTPS hostnames, no URL credentials/ports/query parameters, no redirects, a 4-second timeout and public IPv4-only DNS validation. **Version 4 pins the HTTPS TLS socket to the actual validated IPv4 address**, retaining the requested hostname for TLS SNI and certificate verification; it rejects a socket whose remote address differs. This removes the DNS-to-connect race from the live probe path. CI tests enforce the IP-pinned path, hostname verification and denial of private IP targets. The old generic unpinned `probe` is only a unit-test helper, not called by the deployed handler.
+
+**Still required before activation:** independently demonstrate that this Node HTTPS transport works inside the hosted Supabase Edge Runtime and that its named secret key authentication and domain allowlist work end-to-end. A passed mocked test is not proof of platform runtime networking. Do not enable arbitrary user-submitted URLs or disable public IP validation to work around DNS failures.
 
 The approved demo target is an endpoint controlled by the project, not an arbitrary user-submitted URL. A production-grade general-purpose checker still requires egress restrictions or an equivalent address-pinning transport and separate review.
 
 ## Activation plan (not yet executed)
 
 1. Verify production Edge deployment is v3 with named secret-key authorization. Confirm that missing/bad API keys cannot reach the handler, without exposing credentials in logs.
-2. Establish the outbound egress policy and DNS-to-connect protection. Verify the approved health endpoint's public DNS in the Edge runtime; do not rely on desktop DNS alone.
+2. Verify v4's pinned TLS implementation and remote-address check against the *real* approved public HTTPS endpoint from the Edge Runtime, using an authorized one-off call. If the runtime lacks Node HTTPS networking support or hostname certificate validation fails, keep probing OFF; use an independently reviewed egress-restricted alternative instead.
 3. Provision a named FleetLuma checker secret key in the project and store it in Vault. Review potential `pg_net` storage of decrypted request headers and limit privileged DB access.
 4. **Completed:** `pg_cron` and `pg_net` are installed, and Vault was already installed under extension name `supabase_vault`. No scheduled jobs were added. Retain this additive schema state; do not recreate extensions.
 5. Run the preflight portion of `backend/sql/FL-29_checker_cron_REVIEW_ONLY.sql` after dependencies are configured. This reference file intentionally leaves `cron.schedule` commented out.
