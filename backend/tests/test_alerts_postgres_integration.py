@@ -142,6 +142,19 @@ def test_real_agent_report_alert_lifecycle_and_workspace_permissions(monkeypatch
     assert len([i for i in recent if i["status"] == "OPEN"]) == 1
     assert recent[0]["metric"] == "cpu_pct"
 
+    # Editing an active threshold must retire the old incident and restart
+    # consecutive-sample evaluation under the new rule configuration.
+    assert rules.edit_rule(OWNER, cpu["id"],
+                           RuleEdit(threshold_pct=97))["threshold_pct"] == 97
+    assert not any(i["status"] in ("OPEN", "ACKNOWLEDGED")
+                   for i in rules.list_incidents(OWNER, workspace))
+    assert report(99, 30)["status"] == "accepted"
+    assert not any(i["status"] == "OPEN"
+                   for i in rules.list_incidents(OWNER, workspace))
+    assert report(99, 30)["status"] == "accepted"
+    assert len([i for i in rules.list_incidents(OWNER, workspace)
+                if i["status"] == "OPEN"]) == 1
+
     # A revoked reporting credential cannot mutate metric or alert history.
     with connect() as conn, conn.cursor() as cur:
         cur.execute("UPDATE fleetluma.hosts SET lifecycle='REVOKED' WHERE id=%s",
