@@ -149,6 +149,16 @@
 - Final end-to-end operator test still requires signing into Web and Android under the same account, real Windows/Linux telemetry and process history, pairing/rename/revoke using disposable host, 24h CSV export, HTTP check data from real authorized Cron (or explicit disabled-state fallback), then sign-out and workspace isolation checks.
 - Supabase checker key must be a **dedicated named secret API key** named `fleetluma-checker`, stored in Supabase Vault as `fleetluma_checker_api_key` and **never** pasted into chat, GitHub, logs or client apps. No available connector action can provision that key securely; user must do so in the FleetLuma Supabase dashboard.
 
+## Checker key and exact-name authentication verified (2026-11-25)
+- User created a named Supabase **secret API key** and saved its value (not disclosed to ChatGPT) as encrypted Vault secret `fleetluma_checker_api_key`. Database verification returned `stored=true`, `secret_key_format=true`, `length_ok=true` without retrieving the value.
+- A controlled one-off `pg_net` request discovered the deployed function still expected named auth key `fleetluma-checker`, while Supabase's runtime reported the actual name `fleetluma_checker`. These names are **not interchangeable**.
+- Updated the Edge handler, strict Python CI guard, `supabase/config.toml` comments, and activation documentation to `withSupabase({auth:'secret:fleetluma_checker'})`. Deployed Supabase Edge Function **version 6** (`verify_jwt=false` plus named-key auth wrapper).
+- Controlled `pg_net` request ID `2`, with key read only inside Postgres from Vault and never printed, returned **HTTP 503** with sanitized `Checker is not configured` — proving the exact named key is now accepted and application guard remains OFF.
+- Negative control `pg_net` request ID `3`, no API key header, returned **HTTP 401 MISSING_CREDENTIALS** — proving unauthorized callers are rejected before entering the worker.
+- No HTTP service has been enabled; no service checks or checker Cron jobs were created. The next step needs **two non-secret Edge Function environment variables** configured from the FleetLuma Dashboard `/functions/secrets`: `FLEETLUMA_CHECK_ALLOWED_HOSTS=fleetluma-api.vercel.app` and `FLEETLUMA_PUBLIC_PROBES_ENABLED=true`.
+- **After** user configures these non-secret variables: invoke one scoped authorized check only against the owned FleetLuma HTTPS health endpoint, confirm an actual persisted check and Edge Runtime IP-pinned TLS compatibility, then schedule narrow Cron with Vault key only if the real runtime check passes.
+- No credentials, personal login tokens, or raw Vault values are stored in GitHub or Jira.
+
 ## Explicit deferrals
 - General process termination/kill and remote command execution are NOT in Saturday release. A safe proof of concept would need a separate narrowly authorized command architecture and agent changes.
 - Native PDF exports and public signup are NOT in Saturday release.
