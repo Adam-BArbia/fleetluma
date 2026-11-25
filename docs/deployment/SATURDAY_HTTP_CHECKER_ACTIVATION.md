@@ -1,59 +1,48 @@
-# FL-29 / FL-31 - Safe deployment gate for cloud HTTP checking
+# FL-29 / FL-31 — FleetLuma Scheduled HTTP Checker: Activation Gate
 
-**State: PREPARED, NOT ACTIVE.** Do not call HTTP monitoring live based solely on compiled Flutter UI. The checked-in `supabase/functions/fleetluma-checker` source is the intended worker.
+**Status on November 25, 2026: FUNCTION STAGED, NOT PROBING.** The checked-in checker is protected by Supabase's named secret-key authentication, but scheduled execution, approved egress and credential provisioning are **not** complete.
 
-## Actual cloud observation (2026-11-25)
+## Current confirmed deployment
 
-Read-only inspection of FleetLuma Supabase project `mulsyhgdigonccziywet`:
-- `fleetluma.services`: **1 row**, the owned FleetLuma API /health target, **disabled**
-- `fleetluma.service_checks`: **0 rows** (no monitoring data yet)
-- Edge Function: **`fleetluma-checker` v2 deployed**, gateway `verify_jwt=true`, internal probe switch remains unset/off
-- `pg_cron`, `pg_net`, `vault`: not yet installed. No scheduled job exists
+- Supabase project: `mulsyhgdigonccziywet` (FleetLuma only).
+- Edge Function: `fleetluma-checker`, **version 3**, deployed with `verify_jwt=false` because the function itself uses `withSupabase({auth:'secret:fleetluma-checker'})`. This is **not** an anonymous API: the named secret key must be accepted by the Supabase wrapper before the handler executes.
+- `fleetluma.services`: one operator-owned approved target `https://fleetluma-api.vercel.app/health`, with **enabled=false**.
+- `fleetluma.service_checks`: zero recorded checks at the last verified inspection.
+- No scheduled job, Cron credentials, named secret API key or outbound-probe activation has been confirmed. `pg_cron`, `pg_net`, and Vault were absent at the previous extension inspection.
+- `FLEETLUMA_PUBLIC_PROBES_ENABLED` must be the literal `true` and `FLEETLUMA_CHECK_ALLOWED_HOSTS` must contain a precise hostname. Both are intentionally unconfigured.
+- `supabase/config.toml` explicitly records `[functions.fleetluma-checker] verify_jwt=false`; never remove the named secret-key guard while retaining this gateway setting.
 
-The Web monitoring view shows a **disabled** service without a health sample until secure activation.
+## Authentication and credentials
 
-## Boundaries and prerequisites
+Supabase's documented worker-to-worker integration accepts a **named secret API key** on the `apikey` header. The checker requires a specifically named key `fleetluma-checker` using `auth:'secret:fleetluma-checker'`, not a user JWT and not a publishable key.
 
-- Use the existing **FleetLuma Supabase project only**. Do not reuse KTOB project's keys or URLs.
-- Select **one HTTPS health endpoint that you own** and that is publicly reachable. Do not probe internal or special-use network addresses.
-- Configure `FLEETLUMA_CHECK_ALLOWED_HOSTS` as a small exact approved-hostname list. The checker rejects credentials, query strings, ports, redirects and direct IP targets.
-- Validate DNS and egress behavior against DNS rebinding. The current source intentionally rejects IPv6 answers and requires public IPv4; unsuitable dual-stack targets are skipped. **DNS prescreening is not a full solution to DNS rebinding.** Do not expose general arbitrary-URL checking.
-- Provision encrypted private database access only to the Edge Function, never to Flutter. Do not publish credentials, service-role keys or Cron HMAC values in a chat, repository, or CI artifacts.
-- Set a high-entropy `FLEETLUMA_CRON_SECRET` in function secrets and private scheduler configuration, with independent access checks. Source currently compares a separate `x-fleetluma-cron` **shared secret** (not an HMAC) before any database operations. Its gateway also uses `verify_jwt=true`: **new Supabase publishable/secret API keys are not JWTs and cannot simply be passed as `Authorization: Bearer ...` to this gateway.** Choose a documented, compatible service-to-service authentication strategy before writing the Cron request. Never disable gateway JWT verification without independently reviewing and implementing the Supabase `auth:'secret'` server-side authentication wrapper.
-- Confirm pooled TLS connection works for the Edge runtime and that the restricted database role has only necessary read/check-insert/retention privileges.
-- Review extension availability and ongoing plan limits before any Cron deployment.
+An administrator must provision the dedicated secret key in **FleetLuma Supabase Settings → API Keys**, save its exact value privately as a Vault secret named `fleetluma_checker_api_key`, and verify it can invoke only the intended worker. Keep credentials out of the repository, logs, Flutter, screenshots and support messages. The old `FLEETLUMA_CRON_SECRET` and `x-fleetluma-cron` headers are **no longer used by version 3**.
 
-## Activation sequence (do not skip)
+With `verify_jwt=false`, the gateway alone does *not* authenticate calls. The wrapper is mandatory and its named-key enforcement must be verified against missing, malformed, publishable and unauthorized credentials before scheduling.
 
-1. Review `supabase/functions/fleetluma-checker/index.ts`, `checker.ts`, unit tests, DB schema and security review.
-2. Verify trusted endpoint ownership and a stable IPv4-only public DNS response in the target environment. Verify no outbound access to private hosts is possible.
-3. Prepare secret values **directly inside trusted Supabase controls**. Never paste them into generated source, SQL literals, console output or shared files.
-4. **Already deployed:** verify gateway JWT checks and an unconfigured safe/disabled response (note that gateway rejects non-JWT callers before the handler). Do not test with production secrets in logs.
-5. Enable required extensions as a reviewed independent migration; set a narrow job (at most 10 approved services every 60 seconds as currently designed). Confirm job runner and function authentication match.
-6. Register a single authorized service linked to an existing workspace; keep all other services disabled.
-7. Trigger one authorized check and verify an actual persisted `service_checks` row with status, HTTP code/failure kind, server time and latency.
-8. Verify 24-hour metric/check retention and DB role boundaries; verify unauthorized tenant cannot read the service or its history.
-9. Only then enable continuous scheduled checks and mark FL-29/FL-30/FL-31 ready for acceptance.
+## Network security blocker
 
+The source enforces exact approved HTTPS hostnames, no URL credentials/ports/query parameters, no redirect following, a 4-second timeout, and a public IPv4-only DNS precheck. **Pre-resolving DNS and subsequently calling `fetch(url)` does not pin the connection to that address.** Without an outbound-network policy that prevents DNS rebinding to internal, local or metadata addresses, the checker must **not** be activated as a general URL monitoring feature. Do not turn off DNS checks to fix a deployment failure.
 
-## 2026 Supabase service-to-service compatibility
+The approved demo target is an endpoint controlled by the project, not an arbitrary user-submitted URL. A production-grade general-purpose checker still requires egress restrictions or an equivalent address-pinning transport and separate review.
 
-Supabase's November 2026 documentation recommends **secret API keys** for server-to-server functions, via `withSupabase` and `auth: 'secret'` while setting `verify_jwt=false` in the function's gateway configuration. The current FleetLuma worker deliberately uses `verify_jwt=true` **plus** an independent 32+ character shared secret. These are **different** authentication protocols. Do not create a `pg_net` Cron job assuming that a new publishable key or secret API key is automatically a JWT. The existing handler's `x-fleetluma-cron` header by itself cannot bypass the gateway.
+## Activation plan (not yet executed)
 
-Two possible implementations, **neither active yet**:
-- Keep the current gateway JWT requirement: provision an appropriate server-only **JWT-compatible** Authorization credential and a second independent shared secret; configure both through trusted, least-privilege secrets controls, and test the precise gateway compatibility before scheduling.
-- Move to the current documented service-to-service model in a **separately reviewed change**: use `withSupabase(..., {auth:'secret'})` and `verify_jwt=false`; preserve explicit authorization for this specific checker and its database scope, and remove the obsolete shared-secret logic only once the replacement is verified.
+1. Verify production Edge deployment is v3 with named secret-key authorization. Confirm that missing/bad API keys cannot reach the handler, without exposing credentials in logs.
+2. Establish the outbound egress policy and DNS-to-connect protection. Verify the approved health endpoint's public DNS in the Edge runtime; do not rely on desktop DNS alone.
+3. Provision a named FleetLuma checker secret key in the project and store it in Vault. Review potential `pg_net` storage of decrypted request headers and limit privileged DB access.
+4. Review and enable extensions `pg_cron`, `pg_net` and Vault in the existing project only after appropriate backup and access checks. Do not install unrelated extensions.
+5. Run the preflight portion of `backend/sql/FL-29_checker_cron_REVIEW_ONLY.sql` after dependencies are configured. This reference file intentionally leaves `cron.schedule` commented out.
+6. Configure the exact hostname `fleetluma-api.vercel.app` and an approved Edge outbound network policy. Then deliberately enable `FLEETLUMA_PUBLIC_PROBES_ENABLED`.
+7. Enable **only** the registered FleetLuma API test target, run a single authenticated request, and confirm its actual persisted `service_checks` row with latency, status, HTTP result and server timestamp.
+8. Only after the single check passes, install a narrow one-minute job with the named key in the `apikey` header, audit query retention (24h), workspace separation, and revoked-key behavior.
+9. Inspect Web HTTP health charts against actual database samples and mark Jira FL-29/30/31 complete **only** after final end-to-end acceptance.
 
-**Security:** Supabase warns that `pg_net` stores decrypted request credentials temporarily in `net.http_request_queue`. Restrict database access, enforce least privilege and account for credential handling before accepting this design. Also, pre-resolving DNS before `fetch` has a DNS-to-connect race; outbound-network policy or an equivalent address-pinning transport must be reviewed before enabling an internet-facing URL monitor.
+## Rollback and fallback
 
-References: https://supabase.com/docs/guides/functions/schedule-functions and https://supabase.com/docs/guides/functions/auth
+- Disable `FLEETLUMA_PUBLIC_PROBES_ENABLED`, disable the service row, and `cron.unschedule('fleetluma-checker-1m')` if scheduling was ever enabled.
+- Rotate/revoke the dedicated named secret key if any credential might have leaked.
+- Preserve metric history, the stable FastAPI/Web release, the installed Android APK, and the existing agent pairing identities.
+- Until real HTTP rows exist, display **DISABLED / UNKNOWN** and **No recorded HTTP checks**, never synthetic green health data.
 
-## Abort / rollback
-
-- If any auth, DNS, egress or schema check fails, disable scheduler and `FLEETLUMA_PUBLIC_PROBES_ENABLED`, keep existing Web and API aliases untouched, and preserve monitoring data.
-- Do not lower Edge Function authentication, add wildcard CORS, or expose private DB URLs to bypass an operational blocker.
-- No hard-coded green sample. An unavailable checker must be represented as UNKNOWN and `No recorded HTTP checks`.
-
-## Final user-style acceptance
-
-After automation and configuration pass, the operator's one final walkthrough can inspect real HTTP success/error transitions and compare timestamps with genuine persisted rows. Until that point, this module remains a staged implementation dependency.
+Official references: https://supabase.com/docs/guides/functions/auth · https://supabase.com/docs/guides/functions/schedule-functions · https://supabase.com/docs/guides/functions/secrets.
