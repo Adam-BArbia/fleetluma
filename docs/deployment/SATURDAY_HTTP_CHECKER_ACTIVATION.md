@@ -5,16 +5,16 @@
 ## Current confirmed deployment
 
 - Supabase project: `mulsyhgdigonccziywet` (FleetLuma only).
-- Edge Function: `fleetluma-checker`, **version 4**, deployed with `verify_jwt=false` because the function itself uses `withSupabase({auth:'secret:fleetluma-checker'})`. This is **not** an anonymous API: the named secret key must be accepted by the Supabase wrapper before the handler executes.
+- Edge Function: `fleetluma-checker`, **version 4**, deployed with `verify_jwt=false` because the function itself uses `withSupabase({auth:'secret:fleetluma_checker'})`. This is **not** an anonymous API: the named secret key must be accepted by the Supabase wrapper before the handler executes.
 - `fleetluma.services`: one operator-owned approved target `https://fleetluma-api.vercel.app/health`, with **enabled=false**.
 - `fleetluma.service_checks`: zero recorded checks at the last verified inspection.
-- No scheduled job, Cron credentials, named secret API key or outbound-probe activation has been confirmed. Extensions **pg_cron 1.6.4**, **pg_net 0.20.4**, and **supabase_vault 0.3.2** are now installed. Vault existed before; pg_cron and pg_net were installed via the reviewed additive migration `fleetluma_fl29_scheduler_extensions_only`. Explicit verification found **zero FleetLuma Cron jobs**.
+- The named API key `fleetluma_checker` and its encrypted Vault copy `fleetluma_checker_api_key` are present. No scheduled job or outbound-probe activation has been confirmed. Extensions **pg_cron 1.6.4**, **pg_net 0.20.4**, and **supabase_vault 0.3.2** are now installed. Vault existed before; pg_cron and pg_net were installed via the reviewed additive migration `fleetluma_fl29_scheduler_extensions_only`. Explicit verification found **zero FleetLuma Cron jobs**.
 - `FLEETLUMA_PUBLIC_PROBES_ENABLED` must be the literal `true` and `FLEETLUMA_CHECK_ALLOWED_HOSTS` must contain a precise hostname. Both are intentionally unconfigured.
 - `supabase/config.toml` explicitly records `[functions.fleetluma-checker] verify_jwt=false`; never remove the named secret-key guard while retaining this gateway setting.
 
 ## Authentication and credentials
 
-Supabase's documented worker-to-worker integration accepts a **named secret API key** on the `apikey` header. The checker requires a specifically named key `fleetluma-checker` using `auth:'secret:fleetluma-checker'`, not a user JWT and not a publishable key.
+Supabase's documented worker-to-worker integration accepts a **named secret API key** on the `apikey` header. The checker requires a specifically named key `fleetluma_checker` using `auth:'secret:fleetluma_checker'`, not a user JWT and not a publishable key.
 
 An administrator must provision the dedicated secret key in **FleetLuma Supabase Settings → API Keys**, save its exact value privately as a Vault secret named `fleetluma_checker_api_key`, and verify it can invoke only the intended worker. Keep credentials out of the repository, logs, Flutter, screenshots and support messages. The old `FLEETLUMA_CRON_SECRET` and `x-fleetluma-cron` headers are **no longer used by version 3**.
 
@@ -30,7 +30,7 @@ The approved demo target is an endpoint controlled by the project, not an arbitr
 
 ## Activation plan (not yet executed)
 
-1. Verify production Edge deployment is v3 with named secret-key authorization. Confirm that missing/bad API keys cannot reach the handler, without exposing credentials in logs.
+1. Verify production Edge deployment is v5 with named secret-key authorization. Confirm that missing/bad API keys cannot reach the handler, without exposing credentials in logs.
 2. Verify v4's pinned TLS implementation and remote-address check against the *real* approved public HTTPS endpoint from the Edge Runtime, using an authorized one-off call. If the runtime lacks Node HTTPS networking support or hostname certificate validation fails, keep probing OFF; use an independently reviewed egress-restricted alternative instead.
 3. Provision a named FleetLuma checker secret key in the project and store it in Vault. Review potential `pg_net` storage of decrypted request headers and limit privileged DB access.
 4. **Completed:** `pg_cron` and `pg_net` are installed, and Vault was already installed under extension name `supabase_vault`. No scheduled jobs were added. Retain this additive schema state; do not recreate extensions.
