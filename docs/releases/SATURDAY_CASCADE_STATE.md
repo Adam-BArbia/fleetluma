@@ -1,0 +1,177 @@
+# FleetLuma Saturday 2026-11-28 - Cascade Implementation State
+
+> This is the handoff ledger for the integrated feature branch, **not** a claim of production release or on-device acceptance. Update it whenever the implementation state changes. Avoid storing secrets or test credentials.
+
+## Baseline and safety
+- Baseline main commit: `89e43f220912f93a27168af45c6e22b64dd17020`.
+- Integration branch: `feat/saturday-cascade-integrated` (branched from FL-22 PR head `93c804dac94c1bb6535210612b1a2adaf099ae59`).
+- Preserve the approved Android APK and existing paired Vercel Web/API aliases until release gates pass. Do not modify Android layout or agent enrollment contracts casually.
+- Demo accounts are restricted; no public signup, fake metrics, arbitrary URL probing, remote shell, or unrestricted process termination.
+- User wants **one final manual end-to-end experience test**, not repeated manual tests after every feature. Automated compiler, unit, security and CI checks still run during integration.
+
+## Carried into integrated branch
+- FL-22 PR #66: recoverable Flutter cloud startup widget, committed Web boot shell and preview caching constraints.
+- FL-26 PR #67: authenticated read-only Web process explorer and its tests; explicitly NO process killing.
+- FL-30 PR #68: authenticated Web HTTP health/check history panel and its tests; cloud scheduled checker NOT yet active.
+
+## Implementation update - 2026-11-25 cascade pass
+- Created the single integration PR #69 (draft): https://github.com/Adam-BArbia/fleetluma/pull/69.
+- Combined FL-22, FL-26, FL-30 modules into this branch; standalone PRs #66-68 remain unmerged for traceability.
+- Added Web real-history CSV export with spreadsheet-formula sanitization and conditional Web downloader. This is export, not a PDF generator.
+- Selected Figma Inter through `google_fonts` 8.2.1; actual Inter font files are not bundled and first-use network fetching/offline resilience remains a final acceptance gate.
+- Added `backend/sql/FL-40_alert_rules.sql` **STAGED ONLY**, `backend/fleetluma_backend/alerts.py`, feature-gated cloud routes + report-time evaluator, pure threshold transition tests, and an optional Web incident/rule UI. Both `FLEETLUMA_ALERTS_ENABLED` (API) and `FLEETLUMA_ALERTS_UI_ENABLED` (Web compile-time) default OFF.
+- **Live Supabase read-only inspection**: the FleetLuma database has 4 host rows, 0 monitored services, 0 HTTP check rows, 0 Edge Functions, and no `pg_cron`/`pg_net`/`vault` extensions currently installed. Do not represent HTTP monitoring as operational.
+- Device management Update gap closed: `HttpFleetDeviceApi.rename()` calls the existing protected PATCH /api/v1/operator/hosts/{id}; Manage Devices now exposes a rename dialog and widget coverage. No agent/auth/DB contract changes.
+- Added PlantUML deployment and alert-lifecycle diagrams, plus `docs/releases/SATURDAY_FINAL_ACCEPTANCE.md` for the operator's one final manual user-style test.
+- Existing Android package and stable Web/API preview aliases have not been changed.
+- Pending: integrated Flutter/backend CI, narrow correction passes, HTTP function security/deployment, real paired-device checks, review/apply alert migration to non-production only before enabling the optional alerts subsystem, and final user-style test.
+
+## Remaining implementation cascade (current status)
+
+1. **Done in source**: FL-22 safe cloud-startup fallback and Web boot shell; diagnose actual intermittent white screen in the final browser acceptance.
+2. **Done in source**: Figma Inter font selection through Google Fonts 8.2.1; verify offline/fallback visual behavior in final browser acceptance.
+3. **Done in source**: authenticated Web-only Top 10 process explorer, genuine CPU/RAM/disk history and CSV export.
+4. **Done in source**: device rename via protected PATCH, alongside existing pair/approve/revoke screens; final physical device/tenant authorization test still needed.
+5. **Done in source, default OFF**: alert rule CRUD, transactional sample thresholds, OPEN/ACKNOWLEDGED/RESOLVED incident lifecycle, backend and Web tests. The additive private FL-40 migration is **applied and verified** in Supabase, but API/Web flags remain OFF and no incidents have been produced.
+6. **Pending infrastructure**: cloud HTTP checker authorization and secrets, strict public-host allowlist and DNS/egress control, Supabase cron/pg_net/Vault activation, one real persisted check and retention verification. Source now supports default `SUPABASE_DB_URL` in Edge Functions; see `docs/deployment/SATURDAY_HTTP_CHECKER_ACTIVATION.md`.
+7. **Pending release**: exact integrated CI status, merge/release approval gates, stable Web and Android artifact, final single user-style Web+Android acceptance. No live production deployment claimed.
+8. **Traceability**: Jira FL-33 (CSV), FL-34 (alerts), FL-35 (rename) created, plus FL-22/26/29/30 updated. UML 33/34 and final acceptance script added.
+
+## Implementation update - 2026-11-25 cloud staging
+- **Supabase FleetLuma project** `mulsyhgdigonccziywet`: `fleetluma-checker` Edge Function deployed as **version 2** with `verify_jwt=true`. The function requires a separate high-entropy `x-fleetluma-cron` secret, explicit hostname allowlist and `FLEETLUMA_PUBLIC_PROBES_ENABLED=true`. None have been configured through this change. **Active deployment does NOT mean active probing.**
+- **One owned API health destination registered, disabled**: `FleetLuma API (demo target)` at `https://fleetluma-api.vercel.app/health`, `enabled=false`. Vercel project `fleetluma-api` owns this domain and has no SSO/password protection. HTTP reachability from the Edge runtime still requires proof.
+- **No HTTP samples yet**: `service_checks=0`; no Cron configured or executed; the Web UI correctly shows the disabled/never-checked state. `pg_cron`/`pg_net`/`vault` extensions remain absent.
+- Checker hardening: 3xx redirects are now `UNHEALTHY` rather than successful, with a regression test; manual redirects are not followed. The Edge Function version 2 includes this code.
+- Web freshness: the latency-history tile refreshes when the parent observes a newly persisted check timestamp.
+- Full integrated CI at source revision `ee9a970172a7a888bdd3f9556ec8a41da5c2b653` passed all seven GitHub Actions workflows, including mobile APK artifact and backend tests; later revisions require their own final CI pass.
+- Safe deployment gates still pending: verify public IPv4-only DNS from Edge and enforce network egress against rebinding, configure function secret/allowlist and approved Cron invoker without revealing credentials, then observe real persisted checks before enabling service and marking the feature complete.
+- Existing Vercel release aliases, Android installed build and `main` have not been modified.
+
+## Implementation update - hardened authenticated UI
+- On failed authenticated refresh, Web host process snapshots, historical chart samples, HTTP service lists/check history, and alert-rule/incident collections now clear previously cached values rather than leaving them visible as current. Retry messages remain sanitized. This is especially important across session expiry and authorization changes.
+- One deliberately disabled API health target and Edge checker v2 are provisioned; no scheduled traffic or fabricated HTTP health samples.
+- Latest integrated source before this checkpoint: `87de016ff1feb97a907e3f98e047ba3ce09c910d`. Automated checks must pass for the next final source commit before production promotion.
+
+## Implementation update - real alert lifecycle verification and scheduler handoff
+- Added `backend/tests/test_alerts_postgres_integration.py` to exercise optional alert-rule CRUD and incident lifecycle against a **disposable PostgreSQL 17** server seeded with synthetic auth/workspace/agent identities.
+- Updated `.github/workflows/postgres-integration.yml` to apply `FL-40_alert_rules.sql` in CI **only**, then verify live Postgres alert creation, acknowledgement, automatic resolution, event audit, duplicate prevention, viewer/outsider boundaries and revoked-agent rejection.
+- Fixed the integration test's outsider case to demand privacy-preserving **404/KeyError** rather than revealing the existence of a different workspace's rule with 403.
+- GitHub Actions `PostgreSQL integration (FL-15)` **passed** on commit `192f997934a4e38ddfb55d79447445302236351a`, including the new optional alert migration and scenario. The alert migration is **not** applied to the live FleetLuma Supabase database.
+- Prepared `backend/sql/FL-29_checker_cron_REVIEW_ONLY.sql`: a commented-out Cron invocation template plus fail-closed Vault/extension preflight. **NOT executed.** Cloud checker remains intentionally disabled and target `enabled=false`.
+- Updated `docs/deployment/SATURDAY_HTTP_CHECKER_ACTIVATION.md` to reflect Edge Function v2 and current Supabase JWT-vs-secret-key authentication differences. Do not schedule `pg_net` until gateway/secret compatibility and DNS-to-connect egress controls are verified.
+- Latest branch as of this record: `2eb447a9a453a8e244a9ddfaa087d6d426f5fe2d`; automated CI still running for this exact commit.
+
+## Preview API verification
+- **Vercel API preview** build is READY for source `0b940496324d251b24f89bf590e39765b9155d18`.
+- Preview deployment ID: `dpl_9XcWTHGqQH1iz7W4EANjASXuLzyg`; URL: `https://fleetluma-i1vec3xem-fleet-luma.vercel.app`.
+- This is a non-production preview (`target=null`), with the previous production alias left intact.
+- A successful Vercel build confirms packaging but not end-to-end runtime health, backend secret availability or database privileges. An unauthenticated web fetch of its `/health` endpoint was unavailable from the current environment; verify with trusted authenticated deployment inspection and the final user acceptance.
+- The last validated PostgreSQL alert lifecycle regression passed in GitHub Actions at `192f997934a4e38ddfb55d79447445302236351a`. After the latest docs-only and review-only SQL changes, rerun all CI gates on the exact final head commit.
+
+## Implementation update - named checker auth and automated regression guard
+- Supabase Edge Function `fleetluma-checker` updated from v2 to **v3**, deployed with `verify_jwt=false` and an explicit `withSupabase({auth:'secret:fleetluma-checker'})` guard. The gateway no longer expects a user/JWT credential; the handler requires the specifically named Supabase secret API key on `apikey`. A gateway flag set to false **without** the wrapper would be unsafe, so they are versioned together.
+- `supabase/config.toml` captures the required per-function gateway setting. This is a **service-to-service** endpoint, never a public monitoring API.
+- The Cron preflight and REVIEW-ONLY SQL use a single Vault-backed named key `fleetluma_checker_api_key`; actual scheduling remains commented out. Latest authoritative guide: `docs/deployment/SATURDAY_HTTP_CHECKER_ACTIVATION.md`.
+- Added `backend/tests/test_checker_release_guards.py` so Python CI detects removal of the named-key guard, the explicit probe opt-in switch, approved host validation, and accidental uncommenting of Cron schedule SQL.
+- **Still disabled**: no named key/secret provisioned, no Cron, no egress approval, no service enable, and no persisted check. Do not treat deployed `ACTIVE` Edge function status as active probing. Live `main` API/Web aliases and existing Android remain unchanged.
+- Security status: DNS prevalidation followed by `fetch(hostname)` is subject to a DNS-to-connect race. Do not activate general URL probing without outbound egress control, independent of CI status.
+- GitHub Actions for commit `f1a7129a63a0fe980795f7d9691f55b224b12994` started; full CI acceptance remains pending on this exact revision.
+
+## Implementation update - scheduler extension prerequisites
+- **Live Supabase migration applied successfully:** `fleetluma_fl29_scheduler_extensions_only` installed `pg_cron` 1.6.4 and `pg_net` 0.20.4 in the **FleetLuma** project. Vault was already installed under actual extension name `supabase_vault` 0.3.2 (previous searches mistakenly looked for extension `vault`).
+- No Cron job was created. Read-back verified **0** job names beginning `fleetluma`. No real HTTP probe was triggered, and the known FleetLuma API service row remains disabled.
+- The exact additive SQL is versioned in `backend/sql/FL-29_scheduler_extensions.sql`, and the activation runbook is updated. This unblocks the infrastructure prerequisite **only**; the named secret key, Vault secret value, outbound egress/DNS-to-connect policy, single successful check and scheduling approval remain outstanding.
+- Final source revision before this ledger update: `6aaaee7b443adaef2a7a569b442222537a29587f`; inspect exact-head CI before final build sign-off.
+
+## Implementation update - private live alert schema applied
+- The **additive migration** `fleetluma_fl40_alert_rules_private` was applied successfully to the actual FleetLuma Supabase database after the equivalent migration passed isolated PostgreSQL CI. No existing monitoring rows or host identities were edited.
+- Verified new private tables: `fleetluma.alert_rules`, `alert_rule_state`, `incidents`, `incident_events`. All four have row-level security **enabled**; direct `anon` and `authenticated` read privileges remain **false**.
+- At verification: `alert_rules=0`, `incidents=0`, and existing metrics still show `3034` received samples in the queried 24-hour window. `FLEETLUMA_ALERTS_ENABLED` and `FLEETLUMA_ALERTS_UI_ENABLED` remain **OFF**; there is no live incident evaluator or user-visible alert UI until explicitly enabled on a staged deployment.
+- Supabase security advisor now reports additional informational `rls_enabled_no_policy` notices for these four tables. This is expected for the deliberately private, server-only FleetLuma schema with no public Data API grants; do not create broad authenticated RLS policies merely to silence the warning.
+- Schema migration is recorded in Supabase migrations, distinct from the no-job scheduler extension migration; preserve both records for traceability.
+
+## Cloud candidate artifacts (2026-11-25)
+- Created `.github/ci/fleetluma_cloud_demo.public.json`, containing **only** the public FleetLuma Supabase publishable key and exact HTTPS API/Auth origins. No database password, agent credential, server secret, service-role key or Vercel token is embedded.
+- Added isolated `.github/workflows/cloud-candidate-artifacts.yml` to build **both** Flutter Android debug APK and Flutter Web release from the **same** integration commit, passing `--dart-define-from-file`. It validates the public key's expected prefix, exact approved domains and the absence of extra environment fields, then runs `flutter analyze` and `flutter test`.
+- This corrects the normal Android CI artifact's local emulator `10.0.2.2` default: the integrated cloud candidate targets `https://fleetluma-api.vercel.app` and the existing FleetLuma Supabase Auth project. The Web candidate is a ZIP artifact only, not a Vercel deployment.
+- Artifacts are **debug/preview candidates**, not released or signed general-availability packages. Until API/Web source from PR #69 is promoted, richer UI features may not be supported by the currently released backend; do not present any cloud candidate as end-to-end accepted.
+- At creation, cloud candidate workflow run `45596159643` was in progress. Inspect its final conclusion and upload artifacts at the exact source SHA before sharing with the operator.
+
+## Verified integrated cloud artifacts (2026-11-25)
+- Exact source SHA `82f044d9315aedc2f2ca2e96d503e3db604430e9` passed **all eight** GitHub Actions workflows: PostgreSQL integration, backend tests, Flutter mobile tests, Flutter Web build, cloud preview contract, PlantUML validation, scheduled checker tests, and cloud candidate build.
+- Cloud candidate run `45596159643` **SUCCESS**, with Android debug APK artifact `15012784717` (`fleetluma-integrated-cloud-android-debug-apk`, ~80.3MB ZIP transport size) and Web release ZIP artifact `15014555103` (`fleetluma-integrated-cloud-web-candidate`, ~14.3MB ZIP transport size).
+- These two artifacts embed **only** the public Supabase publishable API key and the actual HTTPS API and Supabase origins, built from the same code revision. This fixes the older CI Android APK's emulator-only 10.0.2.2 configuration.
+- Artifacts are **not final user-accepted releases** and should not be installed before the matching integrated FastAPI Web/API backend is staged/promoted. Production Vercel aliases remain unchanged.
+- GitHub Actions run URL: https://github.com/Adam-BArbia/fleetluma/actions/runs/45596159643
+
+## Implementation update — browser startup regression and alert rule edits (2026-11-25)
+- FL-22 now has a real Playwright regression script `.github/scripts/web_boot_smoke.cjs` and GitHub Actions workflow `.github/workflows/web-browser-smoke.yml`. The job compiles real cloud-configured Flutter Web, launches 5 fresh Chromium and 5 fresh Firefox sessions, validates the Flutter first-frame event and hidden boot overlay, checks reload, and verifies a failed bootstrap visibly presents a recovery message.
+- The first browser job failed **before testing** because Playwright 1.56.1 does not support the GitHub ubuntu-latest 26.04 runner. The workflow was pinned to `ubuntu-24.04`. Follow-up run **45599863787 succeeded**, so all ten browser launches and script-failure recovery passed headless CI. This does not replace a physical final user test or prove all intermittent field conditions.
+- FL-34 alert editing now retires a prior active incident whenever an existing threshold or debounce requirement changes; the evaluation counter resets so a new incident must meet the new rule's consecutive-sample requirement. A real PostgreSQL integration regression was added. Alert runtime and UI flags remain OFF on production.
+- Latest source with these fixes: `5a51ceb6e2e03bf0e9845cee35e06ae08dca2b2a`. Browser smoke, backend, checker, PostgreSQL integration, PlantUML, preview contract, and Flutter Web CI passed on that commit; Android and cloud candidate jobs must be checked separately before final sign-off.
+- Non-production integrated FastAPI preview deployment for prior source SHA `6a82de9834a31bef6fe05a10affeb915214e339b` is READY at `https://fleetluma-42yd3zu4g-fleet-luma.vercel.app`. Preview runtime authentication/health still needs accepted browser verification; production API alias remains unchanged.
+
+## Reliability hardening — cache-enabled reloads (2026-11-25)
+- The `main`-equivalent integrated source at `2e05b6c92f128920037daaa3e2b882d43ef7c2b1` passed **all nine GitHub Actions workflows**, including real-browser Chromium/Firefox cold starts and recovery, backend, PostgreSQL, Android, Web, cloud artifacts, checker and UML.
+- Added `checkWarmReloads` to `.github/scripts/web_boot_smoke.cjs`: two browser families, four normal-cache/service-worker-enabled loads each, assert Flutter first frame and hidden loader, capture screenshot and console/failed asset diagnostics on errors.
+- GitHub Actions browser-smoke run `45604522671` **passed** for code commit `13e52220e3bedf4cd96f6b8c6e1f85af2903a782`; this supplements the ten fresh private-context launches with eight warm-cache checks (18 total starts plus reload/recovery cases).
+- Same commit also passed backend, PostgreSQL, checker, Web and UML workflows; cloud APK and mobile tests were still being finalized at the time of this entry. Do not treat previous successful builds as confirmation of a later commit.
+- These headless browser tests use a local static build with no real operator login. They **do not replace** the user's final real Web+Android session or prove that protected deployed preview routes are accessible.
+- Critical remaining cloud dependencies unchanged: dedicated named Supabase checker key in Vault, approved outbound egress/DNS-to-connect safety, real persisted HTTP checks, optional alert enablement decision and final user acceptance.
+
+## FL-36 — independent 24-hour data retention now active (Nov 25)
+- Live FleetLuma telemetry audit before cleanup: 7,912 samples, of which 4,269 exceeded 24 hours; checker monitoring rows = 0. The original retention depended on the disabled optional HTTP Edge checker, so stale telemetry had accumulated.
+- Added private SECURITY INVOKER PostgreSQL function `fleetluma.prune_expired_history()` and approved additive migration `fleetluma_fl36_private_history_pruner`, plus 15-minute Cron job `fleetluma-history-retention-15m` via migration `fleetluma_fl36_retention_cron_15m`. No HTTP calls or checker secrets.
+- The isolated PostgreSQL CI test initially failed because its new fixture omitted the post-FL-32 workspace_id constraint; fixed in commit `b65728058103928118bd9f02773709270635a60f`. PostgreSQL integration CI **passed** in run `45614419345`.
+- First live execution of the pruner returned `samples_deleted=4269`, `checks_deleted=0`. Verified Cron job id 1 active with schedule `*/15 * * * *`, 3,645 remaining samples immediately after first cleanup with a one-sample rolling expiration at the query boundary. The rolling time boundary can allow a few samples to reach 24h before the next 15-minute cleanup.
+- Confirmed the function is **not executable** by `anon` or `authenticated` and zero jobs named `fleetluma-checker%`; the optional HTTP probing security gate is unchanged.
+- Retention excludes host records and agent pairing state; the integrated production Web/API and installed APK have not been promoted. Rollback job only: `SELECT cron.unschedule('fleetluma-history-retention-15m');`. This does not restore previously expired rows.
+- Source files: `backend/sql/FL-36_history_retention_function.sql`, `backend/sql/FL-36_history_retention_schedule.sql`, `backend/tests/test_retention_postgres_integration.py`.
+
+## Verified deployed FastAPI health (Nov 25)
+- Used the connected Vercel deployment fetcher to request `/health` on **both** the current production alias `https://fleetluma-api.vercel.app/health` and the isolated API preview `https://fleetluma-42yd3zu4g-fleet-luma.vercel.app/health`. Both returned HTTP 200 with JSON `{"status":"ready","mode":"cloud"}`.
+- Attempts to fetch protected host/service endpoints without authentication could not complete: Vercel's preview share-link authentication blocked the requests at `fetch_deployment` with `deployment_authentication_required`. **This is not proof that the FastAPI authorization layer returned 401**; test authenticated and unauthenticated API access independently in the final acceptance sequence.
+- No production promotion, alias updates or Android installation performed.
+
+## FL-36 — automatic retention actually executed
+- PostgreSQL `cron.job_run_details` recorded the **first automatic** `fleetluma-history-retention-15m` job as `succeeded`: `2026-11-25 13:30:00 UTC`, finished about 4 milliseconds later, result `1 row`.
+- Following the scheduled execution, a scoped query returned **0 expired samples**. This independently proves background Cron execution in addition to the manually triggered initial cleanup.
+- Jira FL-36 contains before/after counts, rollout, privileges, CI and successful Cron evidence. The separate HTTP checker remains without scheduled jobs and without user-provided named key.
+
+## HTTP checker v4 and matched release candidate — 2026-11-25
+- Checker source now probes using `verifyPublicDns` followed by `probePinned` (Node HTTPS custom address lookup, SNI for the original hostname and certificate verification, no redirects, 443 only, 4-second hard deadline). Runtime code rejects mismatched socket remote IP. Removed the checker's previous duplicate retention cleanup: FL-36 already runs independently in PostgreSQL.
+- Updated checker TypeScript regressions prove public-IP pinning, verified hostname TLS settings and private IP rejection. Static Python CI prevents a later return to unpinned `fetch` in the live handler. Checker CI **passed** at source `1b8bedfd667dc0e09f6054ede9ac33bed960db4f`.
+- Deployed Supabase **`fleetluma-checker` v4** to FleetLuma project `mulsyhgdigonccziywet`; source readback confirms the IP-pinned implementation and named-key auth guard are deployed. `verify_jwt=false` is coupled to the named `withSupabase({auth:'secret:fleetluma-checker'})` wrapper.
+- Verified safety at deployment: `enabled_services=0`, `service_checks=0`, `checker_jobs=0`. **No live HTTP-check success or authorized Edge Runtime network test yet.** A real isolated authorized request and secret-key configuration still gate activation; do not enable arbitrary URLs or imply all runtime network capabilities are proven.
+- Exact integrated commit `7f96bcd25101a38bdfddec83a5c1a10ebe3a7459` **PASSED all nine GitHub Actions workflows**. Run `45628060759` uploaded Android candidate `fleetluma-integrated-cloud-android-debug-apk` (artifact `15030505502`) and Web bundle `fleetluma-integrated-cloud-web-candidate` (artifact `15029378219`), both from that exact commit.
+- Isolated Vercel FastAPI preview **READY** for the same source commit: `dpl_FU8GRPjr4NCwNeYRp8ELTGWBzTJr`, URL `https://fleetluma-36q7zrhni-fleet-luma.vercel.app`. Live fetch of `/health` returned HTTP 200 and `{"status":"ready","mode":"cloud"}`.
+- **Critical matching caveat:** The candidate Android/Web configuration intentionally embeds `https://fleetluma-api.vercel.app` (current *production* API), **not** the isolated preview URL. New candidate features therefore are NOT end-to-end validated against their matching backend by these compilation tests alone. Preview's Vercel Authentication may block arbitrary Android requests. Do not ask user to install/rely on candidate as an accepted release before coordinated API/Web promotion or a reviewed accessible staging environment.
+- Final end-to-end operator test still requires signing into Web and Android under the same account, real Windows/Linux telemetry and process history, pairing/rename/revoke using disposable host, 24h CSV export, HTTP check data from real authorized Cron (or explicit disabled-state fallback), then sign-out and workspace isolation checks.
+- Supabase checker key must be a **dedicated named secret API key** named `fleetluma-checker`, stored in Supabase Vault as `fleetluma_checker_api_key` and **never** pasted into chat, GitHub, logs or client apps. No available connector action can provision that key securely; user must do so in the FleetLuma Supabase dashboard.
+
+## Checker key and exact-name authentication verified (2026-11-25)
+- User created a named Supabase **secret API key** and saved its value (not disclosed to ChatGPT) as encrypted Vault secret `fleetluma_checker_api_key`. Database verification returned `stored=true`, `secret_key_format=true`, `length_ok=true` without retrieving the value.
+- A controlled one-off `pg_net` request discovered the deployed function still expected named auth key `fleetluma-checker`, while Supabase's runtime reported the actual name `fleetluma_checker`. These names are **not interchangeable**.
+- Updated the Edge handler, strict Python CI guard, `supabase/config.toml` comments, and activation documentation to `withSupabase({auth:'secret:fleetluma_checker'})`. Deployed Supabase Edge Function **version 6** (`verify_jwt=false` plus named-key auth wrapper).
+- Controlled `pg_net` request ID `2`, with key read only inside Postgres from Vault and never printed, returned **HTTP 503** with sanitized `Checker is not configured` — proving the exact named key is now accepted and application guard remains OFF.
+- Negative control `pg_net` request ID `3`, no API key header, returned **HTTP 401 MISSING_CREDENTIALS** — proving unauthorized callers are rejected before entering the worker.
+- No HTTP service has been enabled; no service checks or checker Cron jobs were created. The next step needs **two non-secret Edge Function environment variables** configured from the FleetLuma Dashboard `/functions/secrets`: `FLEETLUMA_CHECK_ALLOWED_HOSTS=fleetluma-api.vercel.app` and `FLEETLUMA_PUBLIC_PROBES_ENABLED=true`.
+- **After** user configures these non-secret variables: invoke one scoped authorized check only against the owned FleetLuma HTTPS health endpoint, confirm an actual persisted check and Edge Runtime IP-pinned TLS compatibility, then schedule narrow Cron with Vault key only if the real runtime check passes.
+- No credentials, personal login tokens, or raw Vault values are stored in GitHub or Jira.
+
+## FL-29 / FL-31 / FL-30: checker live activation successfully verified (Nov 25)
+- Supabase checker key `fleetluma_checker`, encrypted Vault secret `fleetluma_checker_api_key`, and non-secret Edge environment variables have been configured. Unauthorized call without `apikey` returned **401**, and an authorized but disabled worker returned **503**. A configured worker with zero enabled services returned `checked=0/skipped=0`.
+- Approved **only** `https://fleetluma-api.vercel.app/health` as enabled. The first attempted public probe revealed an over-strict dual-stack DNS policy; updated validation to allow AAAA records without ever connecting over IPv6. The subsequent Node HTTPS API failed during setup in the hosted Edge Runtime. Kept the genuine failures in `service_checks` as `UNHEALTHY` rather than inventing healthy measurements.
+- Replaced Node HTTPS with native Deno TLS using `Deno.connect` pinned to a verified public IPv4 and `Deno.startTls` using the original approved hostname for TLS SNI and certificate verification. No redirect following, untrusted URL/IP, credentials in HTTP request or second hostname DNS lookup. Function **v12** deployed.
+- **Real manual probe succeeded:** 2026-11-25 **14:58:19 UTC**, persisted `HEALTHY / HTTP 200 / 335.51ms / failure_kind=none`.
+- **Cron enabled:** job **2**, `fleetluma-checker-1m`, `* * * * *`, calls only the named-key-restricted function with its key sourced at runtime from Vault, not in job command literals. **First automatic Cron execution succeeded** at 14:59 UTC; new persisted **14:59:01 UTC HEALTHY / HTTP 200 / 276.61ms** confirms recurring invocation actually ran.
+- Independent FL-36 retention Cron continues job 1 every 15m; both jobs have separate rollback paths. All checker checks retain real timestamps and failure history.
+- Current operational runbook and rollback SQL: `docs/deployment/FL-29_ACTIVE_CHECKER_RUNBOOK.md`; reconciled activation record: `docs/deployment/SATURDAY_HTTP_CHECKER_ACTIVATION.md`. Jira FL-29/30/31 updated with evidence.
+- **Not yet released:** Web status/latency panel must be validated under actual Supabase-authenticated workspace on the coordinated Web/API release. Android build/user physical test and production promotion are separate final gates. The native transport used in Edge v12 has been exercised live; exact-head CI for the newest docs changes must be checked before merge.
+
+## Explicit deferrals
+- General process termination/kill and remote command execution are NOT in Saturday release. A safe proof of concept would need a separate narrowly authorized command architecture and agent changes.
+- Native PDF exports and public signup are NOT in Saturday release.
+
+## Completion gate
+CI must pass, cloud Web must load repeatedly in Firefox + Chrome, backend must connect to real Supabase, HTTP checker must persist real checks, metrics/processes must come from actual paired agents, and user must complete final Web + Android acceptance. Do not mark project ready or merge to the released branch before these gates are met.

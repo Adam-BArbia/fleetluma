@@ -1,3 +1,5 @@
+import { request as httpsRequest } from "node:https";
+
 /** Pure validation/probing for scheduled public HTTP endpoint checks. */
 export type CheckResult = {
   checked_at: string;
@@ -5,6 +7,7 @@ export type CheckResult = {
   http_code: number | null;
   latency_ms: number | null;
   failure_kind: "none" | "http_error" | "timeout" | "network_error";
+  diagnostic_code?: string;
 };
 
 export function allowedTarget(rawUrl: string, allowedHosts: Set<string>): URL {
@@ -37,7 +40,8 @@ export async function probe(
       signal: AbortSignal.timeout(4000),
       headers: { "User-Agent": "FleetLuma-Checker/0.1" },
     });
-    const healthy = response.status >= 200 && response.status < 400;
+    // Redirects are deliberately not followed and never imply a healthy service.
+    const healthy = response.status >= 200 && response.status < 300;
     await response.body?.cancel();
     return {
       checked_at, status: healthy ? "HEALTHY" : "UNHEALTHY",
@@ -55,8 +59,8 @@ export async function probe(
 }
 
 /** Defense in depth: reject DNS answers in private/special-use IPv4 ranges.
- * IPv6 is conservatively denied for this demo. The DNS-to-connect race still
- * requires separate egress restrictions before internet-facing deployment.
+ * IPv6 addresses are never dialed by the IP-pinned HTTPS transport.
+ * All returned IPv4 addresses must be public.
  */
 export function isPublicIpv4(raw: string): boolean {
   const parts = raw.split(".");
@@ -79,12 +83,124 @@ export async function verifyPublicDns(
   target: URL,
   resolver: (hostname: string, family: "A" | "AAAA") => Promise<string[]> =
     async (hostname, family) => Deno.resolveDns(hostname, family),
-): Promise<void> {
+): Promise<string> {
   // Fail closed if the resolver is disabled / cannot inspect addresses.
+  // Only IPv4 is used by the pinned TLS transport. An AAAA record is
+  // harmless because the request cannot connect to it.
   const ipv4 = await resolver(target.hostname, "A");
-  const ipv6 = await resolver(target.hostname, "AAAA");
-  if (ipv4.length === 0 || ipv6.length > 0 ||
+  if (ipv4.length === 0 ||
       ipv4.some((address) => !isPublicIpv4(address))) {
-    throw new Error("Public IPv4-only DNS verification failed");
+    throw new Error("Public IPv4 DNS verification failed");
   }
+  // Return the verified IP. The TLS connection must not re-resolve the host.
+  return ipv4[0];
+}
+
+/**
+ * Safe HTTPS status probe, pinning the connection to a prevalidated public IP.
+ * Node's TLS client retains hostname-based SNI/certificate verification;
+ * lookup never resolves the hostname again. No redirects or response bodies.
+ */
+export async function probePinned(
+  rawUrl: string,
+  allowedHosts: Set<string>,
+  verifiedIp: string,
+  requester: typeof httpsRequest = httpsRequest,
+): Promise<CheckResult> {
+  const url = allowedTarget(rawUrl, allowedHosts);
+  if (!isPublicIpv4(verifiedIp)) {
+    throw new Error("Refusing a non-public pinned destination");
+  }
+  const started = performance.now();
+  const checked_at = new Date().toISOString();
+  return await new Promise<CheckResult>((resolve) => {
+    let settled = false;
+    let timedOut = false;
+    // Only a stable allowlisted category may leave the secret-protected
+    // checker; never return raw errors, host IPs, certificates or URLs.
+    let diagnosticCode: string | undefined;
+    let request: ReturnType<typeof httpsRequest> | undefined;
+    const finish = (
+      status: number | null,
+      failure: CheckResult["failure_kind"],
+    ) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(deadline);
+      const healthy = status !== null && status >= 200 && status < 300;
+      resolve({
+        checked_at,
+        status: healthy ? "HEALTHY" : "UNHEALTHY",
+        http_code: status,
+        latency_ms: status === null ? null :
+          Math.max(0, Math.round((performance.now() - started) * 100) / 100),
+        failure_kind: healthy ? "none" :
+          status === null ? failure : "http_error",
+        diagnostic_code: status === null ? diagnosticCode : undefined,
+      });
+    };
+    const deadline = setTimeout(() => {
+      timedOut = true;
+      request?.destroy(new Error("Checker request deadline reached"));
+      finish(null, "timeout");
+    }, 4000);
+    try {
+      request = requester({
+        hostname: url.hostname,
+        servername: url.hostname,
+        port: 443,
+        method: "GET",
+        path: url.pathname,
+        agent: false,
+        rejectUnauthorized: true,
+        timeout: 4000,
+        headers: {
+          "Host": url.hostname,
+          "User-Agent": "FleetLuma-Checker/0.1",
+          "Connection": "close",
+          "Accept": "*/*",
+        },
+        lookup: (hostname, _options, callback) => {
+          if (hostname.toLowerCase() !== url.hostname) {
+            callback(new Error("Unapproved DNS hostname"), "", 4);
+            return;
+          }
+          callback(null, verifiedIp, 4);
+        },
+      }, (response) => {
+        const code = response.statusCode;
+        response.destroy();
+        finish(typeof code === "number" && code >= 100 && code <= 599
+          ? code : null, "network_error");
+      });
+      request.on("socket", (socket) => {
+        socket.once("connect", () => {
+          if (socket.remoteAddress !== verifiedIp) {
+            diagnosticCode = "SOCKET_IP_MISMATCH";
+            request?.destroy(new Error("Connected IP differs from verified IP"));
+          }
+        });
+      });
+      request.on("timeout", () => {
+        timedOut = true;
+        request?.destroy(new Error("Checker request timed out"));
+      });
+      request.on("error", (error: Error & { code?: string }) => {
+        const code = error.code ?? "";
+        const recognized = new Set([
+          "EACCES", "EPERM", "ECONNREFUSED", "ECONNRESET", "ETIMEDOUT",
+          "ENETUNREACH", "EHOSTUNREACH", "ENOTFOUND",
+          "ERR_TLS_CERT_ALTNAME_INVALID", "ERR_INVALID_ARG_TYPE",
+          "ERR_INVALID_PROTOCOL", "ERR_UNSUPPORTED_ESM_URL_SCHEME",
+        ]);
+        diagnosticCode ??= recognized.has(code) ? code : "OTHER_NETWORK_ERROR";
+        finish(null, timedOut ? "timeout" : "network_error");
+      });
+      request.end();
+    } catch {
+      diagnosticCode = "REQUEST_SETUP_ERROR";
+      request?.destroy();
+      finish(null, "network_error");
+    }
+  });
 }

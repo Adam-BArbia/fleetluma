@@ -1,26 +1,28 @@
-/** FL-19: non-public Supabase Edge Function invoked only by authenticated Cron. */
+/** FL-19: restricted Supabase Edge Function invoked by named-key Cron only. */
+import { withSupabase } from "npm:@supabase/server@1.9.2";
 import postgres from "npm:postgres@3.4.7";
-import { allowedTarget, probe, verifyPublicDns } from "./checker.ts";
+import { allowedTarget, verifyPublicDns } from "./checker.ts";
+import { probePinnedNative } from "./deno_probe.ts";
 
 const respond = (status: number, body: object) =>
   new Response(JSON.stringify(body), {
     status, headers: { "Content-Type": "application/json" },
   });
 
-function equalsSecret(a: string, b: string): boolean {
-  if (!a || !b || a.length !== b.length) return false;
-  let different = 0;
-  for (let i = 0; i < a.length; i++) different |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  return different === 0;
-}
-
-Deno.serve(async (request) => {
-  if (request.method !== "POST") return respond(405, { error: "Method not allowed" });
-  const cronSecret = Deno.env.get("FLEETLUMA_CRON_SECRET") ?? "";
-  if (cronSecret.length < 32 || !equalsSecret(request.headers.get("x-fleetluma-cron") ?? "", cronSecret)) {
-    return respond(401, { error: "Not authorized" });
-  }
-  const databaseUrl = Deno.env.get("FLEETLUMA_DB_URL") ?? "";
+// Service-to-service caller authentication is enforced by the Supabase
+// wrapper: ONLY the named secret key "fleetluma_checker" can call this worker.
+// Hosted configuration MUST set verify_jwt=false for apikey-secret mode.
+// The secret is supplied on apikey, never in the function source or URL.
+// No anonymous access: auth:'secret:<name>' fails closed before this handler.
+export default {
+  fetch: withSupabase({ auth: "secret:fleetluma_checker" }, async (request) => {
+    if (request.method !== "POST") {
+      return respond(405, { error: "Method not allowed" });
+    }
+  // Supabase injects SUPABASE_DB_URL into hosted Edge Functions.
+  // An explicit restricted pooler DSN still takes priority when configured.
+  const databaseUrl = Deno.env.get("FLEETLUMA_DB_URL") ??
+    Deno.env.get("SUPABASE_DB_URL") ?? "";
   const hosts = (Deno.env.get("FLEETLUMA_CHECK_ALLOWED_HOSTS") ?? "")
     .split(",").map((x) => x.trim().toLowerCase()).filter(Boolean);
   if (!databaseUrl || hosts.length === 0 || Deno.env.get("FLEETLUMA_PUBLIC_PROBES_ENABLED") !== "true") {
@@ -35,11 +37,21 @@ Deno.serve(async (request) => {
     >`SELECT id, url FROM fleetluma.services WHERE enabled=true ORDER BY name LIMIT 10`;
     let checked = 0;
     let skipped = 0;
+    const skippedByStage = { dns: 0, probe: 0, database: 0 };
+    const networkDiagnostics: Record<string, number> = {};
     for (const service of services) {
+      let stage: keyof typeof skippedByStage = "dns";
       try {
         const target = allowedTarget(service.url, allowed);
-        await verifyPublicDns(target);
-        const result = await probe(service.url, allowed);
+        const verifiedIp = await verifyPublicDns(target);
+        // IP-pinned HTTPS with original hostname SNI + cert verification.
+        stage = "probe";
+        const result = await probePinnedNative(service.url, allowed, verifiedIp);
+        if (result.diagnostic_code) {
+          networkDiagnostics[result.diagnostic_code] =
+            (networkDiagnostics[result.diagnostic_code] ?? 0) + 1;
+        }
+        stage = "database";
         await sql`INSERT INTO fleetluma.service_checks
           (service_id, checked_at, status, http_code, latency_ms, failure_kind)
           VALUES
@@ -47,17 +59,18 @@ Deno.serve(async (request) => {
            ${result.http_code}, ${result.latency_ms}, ${result.failure_kind})`;
         checked++;
       } catch (_err) {
-        // A service's misconfiguration must not crash checks for others.
+        // Only expose a fixed processing stage, never raw host, SQL, or credentials.
+        skippedByStage[stage]++;
         skipped++;
       }
     }
-    // Enforce 24-hour maximum history for the demo, independently of API requests.
-    await sql`DELETE FROM fleetluma.samples WHERE received_at < NOW() - INTERVAL '24 hours'`;
-    await sql`DELETE FROM fleetluma.service_checks WHERE checked_at < NOW() - INTERVAL '24 hours'`;
-    return respond(200, { checked, skipped });
+    // FL-36: independent pg_cron retention runs without a network request.
+    // Do not couple retention to the optional HTTP checker lifecycle.
+    return respond(200, { checked, skipped, skippedByStage, networkDiagnostics });
   } catch (_err) {
     return respond(500, { error: "Scheduled checker unavailable" });
   } finally {
     await sql.end({ timeout: 3 });
   }
-});
+  }),
+};

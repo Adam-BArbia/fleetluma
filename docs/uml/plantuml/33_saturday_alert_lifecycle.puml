@@ -1,0 +1,35 @@
+@startuml
+title FleetLuma - Authenticated Alert and Incident Lifecycle (optional v1 demo)
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName Arial
+skinparam shadowing false
+skinparam activityBorderColor #27374E
+skinparam activityBackgroundColor #F4F7FA
+start
+:Agent samples CPU, RAM and Disk;
+:POST /api/v1/agent/reports;
+if (Agent bearer active and host not revoked?) then (yes)
+  :Commit metric and process snapshot;
+  if (FLEETLUMA_ALERTS_ENABLED?) then (yes)
+    :Select active rules for host FOR UPDATE;
+    :Derive CPU/RAM/Disk usage percentages;
+    if (Value >= rule threshold?) then (yes)
+      :Increase consecutive breach counter;
+      if (Counter >= required and no active incident?) then (yes)
+        :Create OPEN incident and OPENED event;
+      else (no)
+        :Update active incident observation;
+      endif
+    else (no)
+      :Reset consecutive counter;
+      if (Active incident exists?) then (yes)
+        :Resolve incident and append RESOLVED event;
+      endif
+    endif
+  endif
+  :Commit atomically;
+else (no)
+  :Reject 401 without recording data;
+endif
+stop
+@enduml

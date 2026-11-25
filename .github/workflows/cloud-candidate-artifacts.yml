@@ -1,0 +1,99 @@
+# Build preview artifacts from only PUBLIC Flutter configuration; never deploy
+# or inject private infrastructure keys. They are candidates, not signed releases.
+name: FleetLuma integrated cloud candidate artifacts
+on:
+  push:
+    branches: [feat/saturday-cascade-integrated]
+    paths:
+      - 'mobile/**'
+      - '.github/ci/fleetluma_cloud_demo.public.json'
+      - '.github/workflows/cloud-candidate-artifacts.yml'
+  pull_request:
+    paths:
+      - 'mobile/**'
+      - '.github/ci/fleetluma_cloud_demo.public.json'
+      - '.github/workflows/cloud-candidate-artifacts.yml'
+permissions:
+  contents: read
+
+jobs:
+  cloud-candidates:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Validate public-only cloud config
+        run: |
+          python3 - <<'PY'
+          import json
+          from urllib.parse import urlsplit
+          from pathlib import Path
+          cfg=json.loads(Path('.github/ci/fleetluma_cloud_demo.public.json').read_text())
+          expected={'FLEETLUMA_CLOUD_MODE','FLEETLUMA_PAIRING_UI_ENABLED',
+                    'FLEETLUMA_API_BASE_URL','FLEETLUMA_SUPABASE_URL',
+                    'FLEETLUMA_SUPABASE_PUBLISHABLE_KEY'}
+          assert set(cfg)==expected, 'Unexpected cloud config key(s)'
+          assert cfg['FLEETLUMA_CLOUD_MODE']=='true'
+          assert cfg['FLEETLUMA_PAIRING_UI_ENABLED']=='true'
+          key=cfg['FLEETLUMA_SUPABASE_PUBLISHABLE_KEY']
+          assert isinstance(key,str) and key.startswith('sb_publishable_')
+          assert len(key)>30 and not any(c.isspace() for c in key)
+          for field,hostname in [('FLEETLUMA_API_BASE_URL','fleetluma-api.vercel.app'),
+                                 ('FLEETLUMA_SUPABASE_URL','mulsyhgdigonccziywet.supabase.co')]:
+              u=urlsplit(cfg[field])
+              assert (u.scheme=='https' and u.hostname==hostname
+                      and u.username is None and u.password is None and u.port is None
+                      and u.path in ('','/') and not u.query and not u.fragment)
+          print('PASS: public-only HTTPS FleetLuma cloud config; no server secret')
+          PY
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.50.0'
+          channel: stable
+          cache: true
+      - name: Generate Flutter Android and Web scaffolds
+        working-directory: mobile
+        run: flutter create --platforms=android,web --project-name fleetluma .
+      - name: Resolve dependencies and verify Flutter
+        working-directory: mobile
+        run: |
+          flutter pub get
+          flutter analyze
+          flutter test
+      - name: Build real-cloud Android debug candidate
+        working-directory: mobile
+        run: |
+          flutter build apk --debug \
+            --dart-define-from-file=../.github/ci/fleetluma_cloud_demo.public.json
+          test -s build/app/outputs/flutter-apk/app-debug.apk
+          unzip -tqq build/app/outputs/flutter-apk/app-debug.apk
+      - name: Upload real-cloud Android candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: fleetluma-integrated-cloud-android-debug-apk
+          path: mobile/build/app/outputs/flutter-apk/app-debug.apk
+          retention-days: 10
+          if-no-files-found: error
+      - name: Build real-cloud Web candidate
+        working-directory: mobile
+        run: |
+          flutter build web --release \
+            --dart-define-from-file=../.github/ci/fleetluma_cloud_demo.public.json
+          test -s build/web/main.dart.js
+          test -s build/web/index.html
+          test -s build/web/flutter_bootstrap.js
+      - name: Upload isolated Web candidate (not deployed)
+        uses: actions/upload-artifact@v4
+        with:
+          name: fleetluma-integrated-cloud-web-candidate
+          path: mobile/build/web/
+          retention-days: 10
+          if-no-files-found: error
+      - name: Record candidate provenance
+        run: |
+          echo "### FleetLuma integrated candidate" >> "$GITHUB_STEP_SUMMARY"
+          echo "Branch: `$GITHUB_REF_NAME` / `$GITHUB_SHA`" >> "$GITHUB_STEP_SUMMARY"
+          echo "Cloud-connected Android debug APK and Web ZIP are CI artifacts; NOT released or signed for distribution." >> "$GITHUB_STEP_SUMMARY"
+          echo "Uses public publishable key only; existing production aliases and users remain untouched." >> "$GITHUB_STEP_SUMMARY"

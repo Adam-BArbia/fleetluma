@@ -1,0 +1,67 @@
+name: FleetLuma Flutter Web real-browser startup smoke
+on:
+  push:
+    branches: [feat/saturday-cascade-integrated]
+    paths:
+      - 'mobile/**'
+      - '.github/scripts/web_boot_smoke.cjs'
+      - '.github/workflows/web-browser-smoke.yml'
+      - '.github/ci/fleetluma_cloud_demo.public.json'
+  pull_request:
+    paths:
+      - 'mobile/**'
+      - '.github/scripts/web_boot_smoke.cjs'
+      - '.github/workflows/web-browser-smoke.yml'
+      - '.github/ci/fleetluma_cloud_demo.public.json'
+permissions:
+  contents: read
+jobs:
+  browser-startup:
+    # Pinned: Playwright 1.56.1 browsers do not support Ubuntu 26.04 runners.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.50.0'
+          channel: stable
+          cache: true
+      - name: Compile real-cloud Web bundle
+        working-directory: mobile
+        run: |
+          flutter create --platforms=web --project-name fleetluma .
+          flutter pub get
+          flutter build web --release --dart-define-from-file=../.github/ci/fleetluma_cloud_demo.public.json
+          test -s build/web/index.html
+          test -s build/web/main.dart.js
+          test -s build/web/flutter_bootstrap.js
+      - name: Install pinned Playwright and system browsers
+        run: |
+          mkdir -p .ci-browser
+          npm install --prefix .ci-browser --no-save --ignore-scripts --no-audit --no-fund playwright@1.56.1
+          .ci-browser/node_modules/.bin/playwright install --with-deps chromium firefox
+      - name: Serve immutable compiled Web bundle on loopback
+        run: |
+          python3 -m http.server 8088 --bind 127.0.0.1 --directory mobile/build/web > /tmp/fleetluma-web-smoke.log 2>&1 &
+          echo "$!" > /tmp/fleetluma-web-smoke.pid
+          for attempt in $(seq 1 30); do
+            if curl -fsS -o /dev/null http://127.0.0.1:8088/; then exit 0; fi
+            sleep 1
+          done
+          echo 'Web static server failed to start'
+          exit 1
+      - name: Verify 10 real-browser first-frame loads and recovery
+        run: node .github/scripts/web_boot_smoke.cjs
+      - name: Archive browser failures only (screenshots and console)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fleetluma-web-startup-smoke-failures
+          path: |
+            test-results/web-startup/
+            /tmp/fleetluma-web-smoke.log
+          if-no-files-found: ignore
+          retention-days: 7

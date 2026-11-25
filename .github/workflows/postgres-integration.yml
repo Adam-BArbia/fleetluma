@@ -77,3 +77,20 @@ jobs:
           FLEETLUMA_PAIRING_ENABLED: 'true'
           FLEETLUMA_WORKSPACE_ENFORCEMENT_ENABLED: 'true'
         run: python -m pytest -q tests/test_full_stack_agent_pairing.py
+
+      - name: Apply optional alert schema only to disposable CI PostgreSQL
+        run: |
+          psql -h 127.0.0.1 -U postgres -d fleetluma_ci -v ON_ERROR_STOP=1 -f backend/sql/FL-40_alert_rules.sql
+      - name: Verify alert lifecycle and tenant boundaries with real PostgreSQL
+        working-directory: backend
+        env:
+          FLEETLUMA_PAIRING_ENABLED: 'true'
+          FLEETLUMA_ALERTS_ENABLED: 'true'
+        run: python -m pytest -q tests/test_alerts_postgres_integration.py
+
+      - name: Install private retention function in disposable PostgreSQL
+        run: |
+          psql -h 127.0.0.1 -U postgres -d fleetluma_ci -v ON_ERROR_STOP=1 -f backend/sql/FL-36_history_retention_function.sql
+      - name: Test 24-hour retention, idempotence and denied public execution
+        working-directory: backend
+        run: python -m pytest -q tests/test_retention_postgres_integration.py

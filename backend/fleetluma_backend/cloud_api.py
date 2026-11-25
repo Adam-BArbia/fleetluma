@@ -29,8 +29,15 @@ def create_cloud_app(store_factory=PostgresStore, pairing_store_factory=None):
     if pairing_enabled and len(os.environ.get("FLEETLUMA_PAIRING_PEPPER", "")) < 32:
         raise RuntimeError("Pairing requires private secure HMAC secret")
 
+    alerts_enabled = os.environ.get("FLEETLUMA_ALERTS_ENABLED") == "true"
+    if alerts_enabled and not pairing_enabled:
+        raise RuntimeError("Alert rules require workspace-enforced pairing mode")
+
     app = FastAPI(title="FleetLuma Cloud API", version="0.1.0")
     configure_cors(app)
+    if alerts_enabled:
+        from .alerts import make_alert_router
+        app.include_router(make_alert_router())
     if pairing_enabled:
         from .pairing_routes import make_pairing_router
         if pairing_store_factory is None:

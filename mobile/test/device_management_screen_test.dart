@@ -8,6 +8,8 @@ class FakeDeviceApi implements FleetDeviceApi {
   int approveCalls = 0;
   int denyCalls = 0;
   int revokeCalls = 0;
+  int renameCalls = 0;
+  String currentName = 'TUFFEST';
   String? lastCode;
   String? lastWorkspace;
   bool approved = false;
@@ -46,11 +48,18 @@ class FakeDeviceApi implements FleetDeviceApi {
     if (!approved) return [];
     return [
       ManagedDevice(
-        id: 'host-1', name: 'TUFFEST', os: 'windows',
+        id: 'host-1', name: currentName, os: 'windows',
         lifecycle: revoked ? 'REVOKED' : 'ACTIVE',
         status: revoked ? 'REVOKED' : 'CONNECTED',
       ),
     ];
+  }
+
+  @override
+  Future<void> rename(String hostId, String newName) async {
+    expect(hostId, 'host-1');
+    renameCalls++;
+    currentName = newName;
   }
 
   @override
@@ -99,6 +108,20 @@ void main() {
     await tester.pumpAndSettle();
     expect(api.revokeCalls, 1);
     expect(find.text('Revoked'), findsOneWidget);
+  });
+
+  testWidgets('operator renames a registered device', (tester) async {
+    final api = FakeDeviceApi()..approved = true;
+    await tester.pumpWidget(MaterialApp(home: DeviceManagementScreen(api: api)));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Rename TUFFEST'));
+    await tester.pumpAndSettle();
+    expect(find.text('Rename device'), findsOneWidget);
+    await tester.enterText(find.byType(TextField).last, 'Demo workstation');
+    await tester.tap(find.text('Save name'));
+    await tester.pumpAndSettle();
+    expect(api.renameCalls, 1);
+    expect(find.text('Demo workstation'), findsOneWidget);
   });
 
   testWidgets('invalid display code cannot be submitted', (tester) async {

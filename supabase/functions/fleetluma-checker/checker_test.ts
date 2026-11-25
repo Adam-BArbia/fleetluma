@@ -1,5 +1,8 @@
 import { assertEquals, assertRejects, assertThrows } from "jsr:@std/assert@1.0.10";
-import { allowedTarget, probe, isPublicIpv4, verifyPublicDns } from "./checker.ts";
+import { allowedTarget, probe, probePinned, isPublicIpv4, verifyPublicDns } from "./checker.ts";
+import { EventEmitter } from "node:events";
+import type { ClientRequest } from "node:http";
+import type { RequestOptions } from "node:https";
 
 const allowed = new Set(["status.example.test"]);
 
@@ -35,6 +38,21 @@ Deno.test("Classify successful and failing HTTP status codes", async () => {
   assertEquals(failure.failure_kind, "http_error");
 });
 
+Deno.test("Redirects are never followed and never reported as healthy", async () => {
+  let redirectMode: RequestRedirect | undefined;
+  const result = await probe("https://status.example.test/health", allowed,
+    (async (_input: URL | RequestInfo, init?: RequestInit) => {
+      redirectMode = init?.redirect;
+      return new Response(null, {
+        status: 302, headers: { Location: "http://127.0.0.1/admin" },
+      });
+    }) as typeof fetch);
+  assertEquals(redirectMode, "manual");
+  assertEquals(result.status, "UNHEALTHY");
+  assertEquals(result.http_code, 302);
+  assertEquals(result.failure_kind, "http_error");
+});
+
 Deno.test("Network errors do not masquerade as HEALTHY", async () => {
   const failure = await probe("https://status.example.test/", allowed,
     (async () => { throw new TypeError("network down"); }) as typeof fetch);
@@ -52,12 +70,71 @@ Deno.test("Private, metadata and special IPv4 addresses are rejected", () => {
   assertEquals(isPublicIpv4("8.8.8.8"), true);
 });
 
-Deno.test("Public DNS verification rejects private and IPv6 answers", async () => {
+Deno.test("Public DNS validates all IPv4 answers and safely permits dual-stack hosts", async () => {
   const target = allowedTarget("https://status.example.test/", allowed);
-  await verifyPublicDns(target, async (_hostname, family) =>
-    family === "A" ? ["8.8.8.8"] : []);
-  await assertRejects(() => verifyPublicDns(target, async (_hostname, family) =>
-    family === "A" ? ["127.0.0.1"] : []));
-  await assertRejects(() => verifyPublicDns(target, async (_hostname, family) =>
-    family === "A" ? ["8.8.8.8"] : ["::1"]));
+  let ipv6Requested = false;
+  assertEquals(await verifyPublicDns(target, async (_hostname, family) => {
+    if (family === "AAAA") {
+      ipv6Requested = true;
+      return ["::1"];
+    }
+    return ["8.8.8.8"];
+  }), "8.8.8.8");
+  assertEquals(ipv6Requested, false);
+  await assertRejects(() => verifyPublicDns(target, async () => ["127.0.0.1"]));
+  await assertRejects(() => verifyPublicDns(target, async () => ["8.8.8.8", "192.168.1.2"]));
+  await assertRejects(() => verifyPublicDns(target, async () => []));
+});
+
+
+Deno.test("IP-pinned TLS requires a verified public address before constructing request", async () => {
+  let invoked = false;
+  const fake = (() => {
+    invoked = true;
+    throw new Error("requester must not be invoked");
+  }) as unknown as Parameters<typeof probePinned>[3];
+  await assertRejects(() =>
+    probePinned("https://status.example.test/health", allowed, "127.0.0.1", fake));
+  assertEquals(invoked, false);
+});
+
+Deno.test("TLS request uses exactly the verified IP and preserves HTTPS hostname checks", async () => {
+  let options: RequestOptions | undefined;
+  const mock = ((opts: RequestOptions, callback: (response: unknown) => void) => {
+    options = opts;
+    const request = new EventEmitter() as ClientRequest;
+    const socket = new EventEmitter() as unknown as ClientRequest["socket"];
+    Object.defineProperty(socket, "remoteAddress", { value: "8.8.8.8" });
+    request.end = (() => {
+      request.emit("socket", socket);
+      (socket as EventEmitter).emit("connect");
+      const response = {
+        statusCode: 204,
+        destroy() { /* no response body consumed */ },
+      };
+      callback(response);
+      return request;
+    }) as typeof request.end;
+    request.destroy = (() => request) as typeof request.destroy;
+    return request;
+  }) as unknown as Parameters<typeof probePinned>[3];
+  const result = await probePinned(
+    "https://status.example.test/health", allowed, "8.8.8.8", mock);
+  assertEquals(result.status, "HEALTHY");
+  assertEquals(result.http_code, 204);
+  assertEquals(options?.hostname, "status.example.test");
+  assertEquals(options?.servername, "status.example.test");
+  assertEquals(options?.port, 443);
+  assertEquals(options?.rejectUnauthorized, true);
+  assertEquals(options?.agent, false);
+  assertEquals(options?.method, "GET");
+  assertEquals(options?.path, "/health");
+  assertEquals((options?.headers as Record<string, string> | undefined)?.["Host"], "status.example.test");
+  const lookup = options?.lookup;
+  if (typeof lookup !== "function") throw new Error("IP-pinning lookup missing");
+  let resolved = "";
+  lookup("status.example.test", {}, (_err, ip) => {
+    resolved = ip as string;
+  });
+  assertEquals(resolved, "8.8.8.8");
 });

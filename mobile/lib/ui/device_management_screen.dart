@@ -114,6 +114,45 @@ class _DeviceManagementScreenState extends State<DeviceManagementScreen> {
     }
   });
 
+  Future<void> _renameDevice(ManagedDevice device) async {
+    var editedName = device.name;
+    final next = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Rename device'),
+        content: TextFormField(
+          initialValue: device.name,
+          autofocus: true,
+          maxLength: 64,
+          onChanged: (value) => editedName = value,
+          decoration: const InputDecoration(labelText: 'Display name'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final name = editedName.trim();
+              if (name.length < 2 || name.length > 64) return;
+              Navigator.pop(dialogContext, name);
+            },
+            child: const Text('Save name'),
+          ),
+        ],
+      ),
+    );
+    if (next == null || !mounted || next == device.name) return;
+    await _perform(() async {
+      await widget.api.rename(device.id, next);
+      final selected = _workspaceId;
+      if (selected == null) return;
+      final updated = await widget.api.hosts(selected);
+      if (mounted) setState(() => _devices = updated);
+    });
+  }
+
   Future<void> _confirmRevoke(ManagedDevice device) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -265,10 +304,20 @@ class _DeviceManagementScreenState extends State<DeviceManagementScreen> {
                       subtitle: Text('${device.os} · ${device.status}'),
                       trailing: device.lifecycle == 'REVOKED'
                           ? const Text('Revoked')
-                          : IconButton(
-                              tooltip: 'Revoke ${device.name}',
-                              icon: const Icon(Icons.block),
-                              onPressed: _busy ? null : () => _confirmRevoke(device),
+                          : Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  tooltip: 'Rename ${device.name}',
+                                  icon: const Icon(Icons.edit_outlined),
+                                  onPressed: _busy ? null : () => _renameDevice(device),
+                                ),
+                                IconButton(
+                                  tooltip: 'Revoke ${device.name}',
+                                  icon: const Icon(Icons.block),
+                                  onPressed: _busy ? null : () => _confirmRevoke(device),
+                                ),
+                              ],
                             ),
                     ),
                   )),
