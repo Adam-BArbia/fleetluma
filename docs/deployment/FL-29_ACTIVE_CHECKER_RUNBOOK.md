@@ -11,7 +11,8 @@
 - Native Deno TLS transport: validated public A records, `Deno.connect` to the prevalidated IPv4, `Deno.startTls` with original hostname for SNI/CA validation. No second DNS lookup, no redirects, no arbitrary port, hard 4-second deadline. Dual-stack hostnames are safe: AAAA records cannot be dialed.
 - Successful authorized **single live check** at 2026-11-25 14:58:19 UTC: persisted `HEALTHY`, HTTP `200`, `335.51 ms`, `failure_kind=none`. Earlier failed experimental checks remain honestly recorded as `UNHEALTHY`.
 - Cron job ID **2**, name `fleetluma-checker-1m`, expression `* * * * *`; invokes Edge Function with a Vault-backed `apikey` header through `pg_net`. The separate FL-36 retention Cron job runs every 15 minutes.
-- **Do not claim recurring execution verified** until `cron.job_run_details` shows a successful job and `fleetluma.service_checks` contains a fresh automatic measurement.
+- **Recurring execution independently verified:** `cron.job_run_details` reported job 2 **succeeded** at 2026-11-25 14:59:00 UTC. The function persisted a new row at 14:59:01 UTC: `HEALTHY`, HTTP `200`, `276.61 ms`, `failure_kind=none`. This confirms the one-minute schedule actually invokes the checker.
+- Earlier IP-pinned Node `https.request` attempts could not initialize in the hosted Edge Runtime; after public IPv4 validation the safe Deno-native `Deno.connect` plus `Deno.startTls` implementation produced real HTTP 200 results. Dual-stack DNS is allowed because only pinned IPv4 is dialed.
 
 ## Authentication proof
 
