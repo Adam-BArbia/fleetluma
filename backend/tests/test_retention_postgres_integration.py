@@ -25,15 +25,18 @@ def test_retention_removes_only_older_monitoring_rows():
     sample_ids = []
     check_ids = []
     with connect() as conn, conn.cursor() as cur:
+        cur.execute("SELECT workspace_id FROM fleetluma.workspace_memberships "
+                    "WHERE role='owner' LIMIT 1")
+        workspace_id = cur.fetchone()["workspace_id"]
         cur.execute("""
-          INSERT INTO fleetluma.hosts (id,name,os,token_hash)
-          VALUES (%s,%s,'linux',%s)
+          INSERT INTO fleetluma.hosts (id,name,os,token_hash,workspace_id)
+          VALUES (%s,%s,'linux',%s,%s)
         """, (host_id, "retention-ci-" + host_id,
-              hashlib.sha256(host_id.encode()).hexdigest()))
+              hashlib.sha256(host_id.encode()).hexdigest(), workspace_id))
         cur.execute("""
-          INSERT INTO fleetluma.services (id,name,url,enabled)
-          VALUES (%s,'retention-ci-check','https://example.test/health',false)
-        """, (service_id,))
+          INSERT INTO fleetluma.services (id,name,url,enabled,workspace_id)
+          VALUES (%s,'retention-ci-check','https://example.test/health',false,%s)
+        """, (service_id, workspace_id))
         for age in (timedelta(hours=49), timedelta(hours=2)):
             cur.execute("""
               INSERT INTO fleetluma.samples
