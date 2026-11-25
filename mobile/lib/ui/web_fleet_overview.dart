@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import '../models/host_snapshot.dart';
 import '../data/fleet_api.dart';
 import 'web_host_history.dart';
+import 'web_host_processes.dart';
+import 'web_http_services.dart';
 import '../state/fleet_controller.dart';
 
 // Web-only presentation dashboard. Uses the existing authenticated poller.
@@ -181,6 +183,10 @@ class WebFleetOverview extends StatelessWidget {
                     SizedBox(width: cardWidth, child: _hostCard(host)),
                 ]);
               }),
+              if (state.api is HttpFleetApi) ...[
+                const SizedBox(height: 20),
+                WebServiceHealthOverview(api: state.api as HttpFleetApi),
+              ],
               const SizedBox(height: 20),
               const Text(
                 'STALE / REVOKED metrics are last-known readings, not live. '
@@ -343,6 +349,12 @@ class WebFleetOverview extends StatelessWidget {
           if (state.api is HttpFleetApi)
             WebHostHistoryCharts(
               key: ValueKey('history-' + host.id),
+              api: state.api as HttpFleetApi,
+              hostId: host.id,
+            ),
+          if (state.api is HttpFleetApi)
+            WebHostProcesses(
+              key: ValueKey('processes-' + host.id),
               api: state.api as HttpFleetApi,
               hostId: host.id,
             ),
