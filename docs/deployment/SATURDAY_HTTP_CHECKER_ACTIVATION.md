@@ -8,7 +8,7 @@
 - Edge Function: `fleetluma-checker`, **version 3**, deployed with `verify_jwt=false` because the function itself uses `withSupabase({auth:'secret:fleetluma-checker'})`. This is **not** an anonymous API: the named secret key must be accepted by the Supabase wrapper before the handler executes.
 - `fleetluma.services`: one operator-owned approved target `https://fleetluma-api.vercel.app/health`, with **enabled=false**.
 - `fleetluma.service_checks`: zero recorded checks at the last verified inspection.
-- No scheduled job, Cron credentials, named secret API key or outbound-probe activation has been confirmed. `pg_cron`, `pg_net`, and Vault were absent at the previous extension inspection.
+- No scheduled job, Cron credentials, named secret API key or outbound-probe activation has been confirmed. Extensions **pg_cron 1.6.4**, **pg_net 0.20.4**, and **supabase_vault 0.3.2** are now installed. Vault existed before; pg_cron and pg_net were installed via the reviewed additive migration `fleetluma_fl29_scheduler_extensions_only`. Explicit verification found **zero FleetLuma Cron jobs**.
 - `FLEETLUMA_PUBLIC_PROBES_ENABLED` must be the literal `true` and `FLEETLUMA_CHECK_ALLOWED_HOSTS` must contain a precise hostname. Both are intentionally unconfigured.
 - `supabase/config.toml` explicitly records `[functions.fleetluma-checker] verify_jwt=false`; never remove the named secret-key guard while retaining this gateway setting.
 
@@ -31,7 +31,7 @@ The approved demo target is an endpoint controlled by the project, not an arbitr
 1. Verify production Edge deployment is v3 with named secret-key authorization. Confirm that missing/bad API keys cannot reach the handler, without exposing credentials in logs.
 2. Establish the outbound egress policy and DNS-to-connect protection. Verify the approved health endpoint's public DNS in the Edge runtime; do not rely on desktop DNS alone.
 3. Provision a named FleetLuma checker secret key in the project and store it in Vault. Review potential `pg_net` storage of decrypted request headers and limit privileged DB access.
-4. Review and enable extensions `pg_cron`, `pg_net` and Vault in the existing project only after appropriate backup and access checks. Do not install unrelated extensions.
+4. **Completed:** `pg_cron` and `pg_net` are installed, and Vault was already installed under extension name `supabase_vault`. No scheduled jobs were added. Retain this additive schema state; do not recreate extensions.
 5. Run the preflight portion of `backend/sql/FL-29_checker_cron_REVIEW_ONLY.sql` after dependencies are configured. This reference file intentionally leaves `cron.schedule` commented out.
 6. Configure the exact hostname `fleetluma-api.vercel.app` and an approved Edge outbound network policy. Then deliberately enable `FLEETLUMA_PUBLIC_PROBES_ENABLED`.
 7. Enable **only** the registered FleetLuma API test target, run a single authenticated request, and confirm its actual persisted `service_checks` row with latency, status, HTTP result and server timestamp.
