@@ -35,6 +35,21 @@ Deno.test("Classify successful and failing HTTP status codes", async () => {
   assertEquals(failure.failure_kind, "http_error");
 });
 
+Deno.test("Redirects are never followed and never reported as healthy", async () => {
+  let redirectMode: RequestRedirect | undefined;
+  const result = await probe("https://status.example.test/health", allowed,
+    (async (_input: URL | RequestInfo, init?: RequestInit) => {
+      redirectMode = init?.redirect;
+      return new Response(null, {
+        status: 302, headers: { Location: "http://127.0.0.1/admin" },
+      });
+    }) as typeof fetch);
+  assertEquals(redirectMode, "manual");
+  assertEquals(result.status, "UNHEALTHY");
+  assertEquals(result.http_code, 302);
+  assertEquals(result.failure_kind, "http_error");
+});
+
 Deno.test("Network errors do not masquerade as HEALTHY", async () => {
   const failure = await probe("https://status.example.test/", allowed,
     (async () => { throw new TypeError("network down"); }) as typeof fetch);
