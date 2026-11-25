@@ -83,6 +83,13 @@
 - The exact additive SQL is versioned in `backend/sql/FL-29_scheduler_extensions.sql`, and the activation runbook is updated. This unblocks the infrastructure prerequisite **only**; the named secret key, Vault secret value, outbound egress/DNS-to-connect policy, single successful check and scheduling approval remain outstanding.
 - Final source revision before this ledger update: `6aaaee7b443adaef2a7a569b442222537a29587f`; inspect exact-head CI before final build sign-off.
 
+## Implementation update - private live alert schema applied
+- The **additive migration** `fleetluma_fl40_alert_rules_private` was applied successfully to the actual FleetLuma Supabase database after the equivalent migration passed isolated PostgreSQL CI. No existing monitoring rows or host identities were edited.
+- Verified new private tables: `fleetluma.alert_rules`, `alert_rule_state`, `incidents`, `incident_events`. All four have row-level security **enabled**; direct `anon` and `authenticated` read privileges remain **false**.
+- At verification: `alert_rules=0`, `incidents=0`, and existing metrics still show `3034` received samples in the queried 24-hour window. `FLEETLUMA_ALERTS_ENABLED` and `FLEETLUMA_ALERTS_UI_ENABLED` remain **OFF**; there is no live incident evaluator or user-visible alert UI until explicitly enabled on a staged deployment.
+- Supabase security advisor now reports additional informational `rls_enabled_no_policy` notices for these four tables. This is expected for the deliberately private, server-only FleetLuma schema with no public Data API grants; do not create broad authenticated RLS policies merely to silence the warning.
+- Schema migration is recorded in Supabase migrations, distinct from the no-job scheduler extension migration; preserve both records for traceability.
+
 ## Explicit deferrals
 - General process termination/kill and remote command execution are NOT in Saturday release. A safe proof of concept would need a separate narrowly authorized command architecture and agent changes.
 - Native PDF exports and public signup are NOT in Saturday release.
