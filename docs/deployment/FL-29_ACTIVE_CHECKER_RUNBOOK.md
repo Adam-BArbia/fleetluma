@@ -14,6 +14,18 @@
 - **Recurring execution independently verified:** `cron.job_run_details` reported job 2 **succeeded** at 2026-11-25 14:59:00 UTC. The function persisted a new row at 14:59:01 UTC: `HEALTHY`, HTTP `200`, `276.61 ms`, `failure_kind=none`. This confirms the one-minute schedule actually invokes the checker.
 - Earlier IP-pinned Node `https.request` attempts could not initialize in the hosted Edge Runtime; after public IPv4 validation the safe Deno-native `Deno.connect` plus `Deno.startTls` implementation produced real HTTP 200 results. Dual-stack DNS is allowed because only pinned IPv4 is dialed.
 
+## Three consecutive automatic HTTP 200 checks confirmed
+
+The SQL Cron execution records show job 2 succeeded at **14:59, 15:00, and 15:01 UTC** on 2026-11-25, with corresponding persisted checks:
+
+| UTC check timestamp | Status | HTTP | Measured latency |
+|---|---|---:|---:|
+| 14:59:01 | HEALTHY | 200 | 276.61 ms |
+| 15:00:01 | HEALTHY | 200 | 356.01 ms |
+| 15:01:00 | HEALTHY | 200 | 338.54 ms |
+
+All three results are real database observations from the hosted Edge Runtime. The two previous experimental `UNHEALTHY` records remain available for accurate history. No other service is enabled; no production FastAPI/Web/Android promotion occurred.
+
 ## Authentication proof
 
 - Missing `apikey` request returned HTTP `401 MISSING_CREDENTIALS`.
