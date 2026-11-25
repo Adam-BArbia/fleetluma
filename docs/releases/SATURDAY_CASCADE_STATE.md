@@ -61,6 +61,13 @@
 - Updated `docs/deployment/SATURDAY_HTTP_CHECKER_ACTIVATION.md` to reflect Edge Function v2 and current Supabase JWT-vs-secret-key authentication differences. Do not schedule `pg_net` until gateway/secret compatibility and DNS-to-connect egress controls are verified.
 - Latest branch as of this record: `2eb447a9a453a8e244a9ddfaa087d6d426f5fe2d`; automated CI still running for this exact commit.
 
+## Preview API verification
+- **Vercel API preview** build is READY for source `0b940496324d251b24f89bf590e39765b9155d18`.
+- Preview deployment ID: `dpl_9XcWTHGqQH1iz7W4EANjASXuLzyg`; URL: `https://fleetluma-i1vec3xem-fleet-luma.vercel.app`.
+- This is a non-production preview (`target=null`), with the previous production alias left intact.
+- A successful Vercel build confirms packaging but not end-to-end runtime health, backend secret availability or database privileges. An unauthenticated web fetch of its `/health` endpoint was unavailable from the current environment; verify with trusted authenticated deployment inspection and the final user acceptance.
+- The last validated PostgreSQL alert lifecycle regression passed in GitHub Actions at `192f997934a4e38ddfb55d79447445302236351a`. After the latest docs-only and review-only SQL changes, rerun all CI gates on the exact final head commit.
+
 ## Explicit deferrals
 - General process termination/kill and remote command execution are NOT in Saturday release. A safe proof of concept would need a separate narrowly authorized command architecture and agent changes.
 - Native PDF exports and public signup are NOT in Saturday release.
