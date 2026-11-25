@@ -6,9 +6,11 @@ import '../data/fleet_api.dart';
 import 'web_host_history.dart';
 import 'web_host_processes.dart';
 import 'web_http_services.dart';
+import 'web_alerts.dart';
 import '../state/fleet_controller.dart';
 
 // Web-only presentation dashboard. Uses the existing authenticated poller.
+const _alertsUiEnabled = bool.fromEnvironment('FLEETLUMA_ALERTS_UI_ENABLED');
 // Android continues to use FleetScreen without any layout changes.
 const _bg = Color(0xFF080E1A);
 const _panel = Color(0xFF111D30);
@@ -186,6 +188,13 @@ class WebFleetOverview extends StatelessWidget {
               if (state.api is HttpFleetApi) ...[
                 const SizedBox(height: 20),
                 WebServiceHealthOverview(api: state.api as HttpFleetApi),
+              ],
+              if (_alertsUiEnabled && state.api is HttpFleetApi) ...[
+                const SizedBox(height: 20),
+                WebAlertsPanel(
+                  api: state.api as HttpFleetApi,
+                  hosts: state.hosts,
+                ),
               ],
               const SizedBox(height: 20),
               const Text(
