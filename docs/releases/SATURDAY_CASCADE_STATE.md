@@ -32,7 +32,7 @@
 2. **Done in source**: Figma Inter font selection through Google Fonts 8.2.1; verify offline/fallback visual behavior in final browser acceptance.
 3. **Done in source**: authenticated Web-only Top 10 process explorer, genuine CPU/RAM/disk history and CSV export.
 4. **Done in source**: device rename via protected PATCH, alongside existing pair/approve/revoke screens; final physical device/tenant authorization test still needed.
-5. **Done in source, default OFF**: alert rule CRUD, transactional sample thresholds, OPEN/ACKNOWLEDGED/RESOLVED incident lifecycle, backend and Web tests, private additive FL-40 schema. Migration NOT applied; flags NOT enabled.
+5. **Done in source, default OFF**: alert rule CRUD, transactional sample thresholds, OPEN/ACKNOWLEDGED/RESOLVED incident lifecycle, backend and Web tests. The additive private FL-40 migration is **applied and verified** in Supabase, but API/Web flags remain OFF and no incidents have been produced.
 6. **Pending infrastructure**: cloud HTTP checker authorization and secrets, strict public-host allowlist and DNS/egress control, Supabase cron/pg_net/Vault activation, one real persisted check and retention verification. Source now supports default `SUPABASE_DB_URL` in Edge Functions; see `docs/deployment/SATURDAY_HTTP_CHECKER_ACTIVATION.md`.
 7. **Pending release**: exact integrated CI status, merge/release approval gates, stable Web and Android artifact, final single user-style Web+Android acceptance. No live production deployment claimed.
 8. **Traceability**: Jira FL-33 (CSV), FL-34 (alerts), FL-35 (rename) created, plus FL-22/26/29/30 updated. UML 33/34 and final acceptance script added.
