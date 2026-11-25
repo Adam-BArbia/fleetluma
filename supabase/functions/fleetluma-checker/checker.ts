@@ -7,6 +7,7 @@ export type CheckResult = {
   http_code: number | null;
   latency_ms: number | null;
   failure_kind: "none" | "http_error" | "timeout" | "network_error";
+  diagnostic_code?: string;
 };
 
 export function allowedTarget(rawUrl: string, allowedHosts: Set<string>): URL {
@@ -115,6 +116,9 @@ export async function probePinned(
   return await new Promise<CheckResult>((resolve) => {
     let settled = false;
     let timedOut = false;
+    // Only a stable allowlisted category may leave the secret-protected
+    // checker; never return raw errors, host IPs, certificates or URLs.
+    let diagnosticCode: string | undefined;
     let request: ReturnType<typeof httpsRequest> | undefined;
     const finish = (
       status: number | null,
@@ -132,6 +136,7 @@ export async function probePinned(
           Math.max(0, Math.round((performance.now() - started) * 100) / 100),
         failure_kind: healthy ? "none" :
           status === null ? failure : "http_error",
+        diagnostic_code: status === null ? diagnosticCode : undefined,
       });
     };
     const deadline = setTimeout(() => {
@@ -171,6 +176,7 @@ export async function probePinned(
       request.on("socket", (socket) => {
         socket.once("connect", () => {
           if (socket.remoteAddress !== verifiedIp) {
+            diagnosticCode = "SOCKET_IP_MISMATCH";
             request?.destroy(new Error("Connected IP differs from verified IP"));
           }
         });
@@ -179,10 +185,20 @@ export async function probePinned(
         timedOut = true;
         request?.destroy(new Error("Checker request timed out"));
       });
-      request.on("error", () =>
-        finish(null, timedOut ? "timeout" : "network_error"));
+      request.on("error", (error: Error & { code?: string }) => {
+        const code = error.code ?? "";
+        const recognized = new Set([
+          "EACCES", "EPERM", "ECONNREFUSED", "ECONNRESET", "ETIMEDOUT",
+          "ENETUNREACH", "EHOSTUNREACH", "ENOTFOUND",
+          "ERR_TLS_CERT_ALTNAME_INVALID", "ERR_INVALID_ARG_TYPE",
+          "ERR_INVALID_PROTOCOL", "ERR_UNSUPPORTED_ESM_URL_SCHEME",
+        ]);
+        diagnosticCode ??= recognized.has(code) ? code : "OTHER_NETWORK_ERROR";
+        finish(null, timedOut ? "timeout" : "network_error");
+      });
       request.end();
     } catch {
+      diagnosticCode = "REQUEST_SETUP_ERROR";
       request?.destroy();
       finish(null, "network_error");
     }
