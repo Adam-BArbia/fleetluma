@@ -144,8 +144,10 @@ class _WebAlertsPanelState extends State<WebAlertsPanel> {
       await task();
       await _load();
     } catch (_) {
-      if(mounted)setState(() => _error=
-        'Alert action failed or permission was denied.');
+      if (mounted) {
+        setState(() => _error =
+          'Alert action failed or permission was denied.');
+      }
     } finally {
       if(mounted)setState(() => _busy=false);
     }
