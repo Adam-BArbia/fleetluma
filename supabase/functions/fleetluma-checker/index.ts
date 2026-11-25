@@ -36,12 +36,16 @@ export default {
     >`SELECT id, url FROM fleetluma.services WHERE enabled=true ORDER BY name LIMIT 10`;
     let checked = 0;
     let skipped = 0;
+    const skippedByStage = { dns: 0, probe: 0, database: 0 };
     for (const service of services) {
+      let stage: keyof typeof skippedByStage = "dns";
       try {
         const target = allowedTarget(service.url, allowed);
         const verifiedIp = await verifyPublicDns(target);
         // IP-pinned HTTPS with original hostname SNI + cert verification.
+        stage = "probe";
         const result = await probePinned(service.url, allowed, verifiedIp);
+        stage = "database";
         await sql`INSERT INTO fleetluma.service_checks
           (service_id, checked_at, status, http_code, latency_ms, failure_kind)
           VALUES
@@ -49,13 +53,14 @@ export default {
            ${result.http_code}, ${result.latency_ms}, ${result.failure_kind})`;
         checked++;
       } catch (_err) {
-        // A service's misconfiguration must not crash checks for others.
+        // Only expose a fixed processing stage, never raw host, SQL, or credentials.
+        skippedByStage[stage]++;
         skipped++;
       }
     }
     // FL-36: independent pg_cron retention runs without a network request.
     // Do not couple retention to the optional HTTP checker lifecycle.
-    return respond(200, { checked, skipped });
+    return respond(200, { checked, skipped, skippedByStage });
   } catch (_err) {
     return respond(500, { error: "Scheduled checker unavailable" });
   } finally {
