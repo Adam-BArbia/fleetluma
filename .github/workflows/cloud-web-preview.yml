@@ -165,10 +165,14 @@ jobs:
         run: |
           set -euo pipefail
           test -s mobile/build/web/index.html
+          test -s mobile/build/web/flutter_bootstrap.js
+          test -s mobile/build/web/main.dart.js
+          grep -q 'fleetluma-boot' mobile/build/web/index.html
+          grep -q 'flutter-first-frame' mobile/build/web/index.html
           mkdir -p .vercel/output/static
           cp -a mobile/build/web/. .vercel/output/static/
           cat > .vercel/output/config.json <<'JSON'
-          {"version":3,"routes":[{"handle":"filesystem"},{"src":"/(.*)","dest":"/index.html"}]}
+          {"version":3,"routes":[{"src":"/(|index\\.html|flutter_bootstrap\\.js|flutter\\.js|main\\.dart\\.js)","headers":{"Cache-Control":"no-store, max-age=0"},"continue":true},{"handle":"filesystem"},{"src":"/(.*)","dest":"/index.html"}]}
           JSON
           mkdir -p .vercel
           cat > .vercel/project.json <<'JSON'
