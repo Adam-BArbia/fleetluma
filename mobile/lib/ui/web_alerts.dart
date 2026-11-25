@@ -132,6 +132,8 @@ class _WebAlertsPanelState extends State<WebAlertsPanel> {
       if(!mounted || generation != _generation)return;
       setState(() {
         _loading=false;
+        _rules=const [];
+        _incidents=const [];
         _error='Alert service unavailable or not activated.';
       });
     }
