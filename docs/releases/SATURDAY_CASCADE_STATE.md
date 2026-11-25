@@ -14,6 +14,16 @@
 - FL-26 PR #67: authenticated read-only Web process explorer and its tests; explicitly NO process killing.
 - FL-30 PR #68: authenticated Web HTTP health/check history panel and its tests; cloud scheduled checker NOT yet active.
 
+## Implementation update - 2026-11-25 cascade pass
+- Created the single integration PR #69 (draft): https://github.com/Adam-BArbia/fleetluma/pull/69.
+- Combined FL-22, FL-26, FL-30 modules into this branch; standalone PRs #66-68 remain unmerged for traceability.
+- Added Web real-history CSV export with spreadsheet-formula sanitization and conditional Web downloader. This is export, not a PDF generator.
+- Selected Figma Inter through `google_fonts` 8.2.1; actual Inter font files are not bundled and first-use network fetching/offline resilience remains a final acceptance gate.
+- Added `backend/sql/FL-40_alert_rules.sql` **STAGED ONLY**, `backend/fleetluma_backend/alerts.py`, feature-gated cloud routes + report-time evaluator, pure threshold transition tests, and an optional Web incident/rule UI. Both `FLEETLUMA_ALERTS_ENABLED` (API) and `FLEETLUMA_ALERTS_UI_ENABLED` (Web compile-time) default OFF.
+- **Live Supabase read-only inspection**: the FleetLuma database has 4 host rows, 0 monitored services, 0 HTTP check rows, 0 Edge Functions, and no `pg_cron`/`pg_net`/`vault` extensions currently installed. Do not represent HTTP monitoring as operational.
+- Existing Android package and stable Web/API preview aliases have not been changed.
+- Pending: integrated Flutter/backend CI, narrow correction passes, HTTP function security/deployment, real paired-device checks, review/apply alert migration to non-production only before enabling the optional alerts subsystem, and final user-style test.
+
 ## Remaining implementation cascade
 1. Fix all CI failures on integrated branch. Revisit first-frame shell behavior, caching, Flutter analyzer and auth.
 2. Match Figma Inter typography (source shows Inter, actual native font files not bundled yet); use consistent semantic typography, not guess exact token measurements.
