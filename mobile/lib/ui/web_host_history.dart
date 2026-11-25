@@ -167,6 +167,7 @@ class _WebHostHistoryChartsState extends State<WebHostHistoryCharts> {
       if (!mounted || token != generation) return;
       setState(() {
         error = 'History unavailable. Latest readings remain above.';
+        points = const [];
         loading = false;
       });
     }
