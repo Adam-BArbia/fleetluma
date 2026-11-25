@@ -115,15 +115,16 @@ class _DeviceManagementScreenState extends State<DeviceManagementScreen> {
   });
 
   Future<void> _renameDevice(ManagedDevice device) async {
-    final controller = TextEditingController(text: device.name);
+    var editedName = device.name;
     final next = await showDialog<String>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Rename device'),
-        content: TextField(
-          controller: controller,
+        content: TextFormField(
+          initialValue: device.name,
           autofocus: true,
           maxLength: 64,
+          onChanged: (value) => editedName = value,
           decoration: const InputDecoration(labelText: 'Display name'),
         ),
         actions: [
@@ -133,7 +134,7 @@ class _DeviceManagementScreenState extends State<DeviceManagementScreen> {
           ),
           FilledButton(
             onPressed: () {
-              final name = controller.text.trim();
+              final name = editedName.trim();
               if (name.length < 2 || name.length > 64) return;
               Navigator.pop(dialogContext, name);
             },
@@ -142,7 +143,6 @@ class _DeviceManagementScreenState extends State<DeviceManagementScreen> {
         ],
       ),
     );
-    controller.dispose();
     if (next == null || !mounted || next == device.name) return;
     await _perform(() async {
       await widget.api.rename(device.id, next);
