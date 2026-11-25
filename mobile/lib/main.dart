@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'data/fleet_api.dart';
@@ -124,14 +125,14 @@ class FleetLumaApp extends StatelessWidget {
           outline: const Color(0xFF33465F),
           error: const Color(0xFFFF8D95),
         ),
-        textTheme: const TextTheme(
+        textTheme: GoogleFonts.interTextTheme(const TextTheme(
           headlineMedium: TextStyle(
             fontSize: 28, fontWeight: FontWeight.w800, letterSpacing: -0.8),
           titleLarge: TextStyle(
             fontSize: 21, fontWeight: FontWeight.w800, letterSpacing: -0.4),
           titleMedium: TextStyle(fontWeight: FontWeight.w700),
           bodyMedium: TextStyle(height: 1.45),
-        ),
+        )),
         cardTheme: CardThemeData(
           color: const Color(0xFF111D30),
           elevation: 0,
