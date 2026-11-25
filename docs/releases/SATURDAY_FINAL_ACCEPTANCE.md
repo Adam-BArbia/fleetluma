@@ -2,6 +2,17 @@
 
 **Workflow:** The operator performs one full user-style acceptance session only after automated checks and integration gates pass. Intermediate source changes are verified by CI, never by repeatedly asking the operator to test unfinished views.
 
+## 2026-11-25 production rollout and remaining physical acceptance
+
+**Deployment completed:** merged PR #69 into main at `c10c10429e6858d1147806d6a1bb80ed7ea3dfdc`, with exactly the same Git tree (`2cda690caa3c66d40124f88b8a2e1b645343539c`) as passing integrated source `107e3d525b306ec90ec8e10142ca86a6472f4091`. All 9 integrated source checks passed. All 7 push-to-main workflow checks passed.
+
+- **API live:** `https://fleetluma-api.vercel.app` now aliases verified READY deployment `dpl_G4tYdg4LXfEVFpxyXgfNjup1pGHK`. GET `/health` returned HTTP 200, `{"status":"ready","mode":"cloud"}`. API runtime error/fatal scan for deployment over 30 minutes returned zero matching logs. Backend still enforces Supabase JWT, explicit operator access, workspace-scoped monitoring. **Previous API alias**: `dpl_47nWXoujANGbTdsHU5jhTaGi7Gs3`.
+- **Web live:** `https://fleetluma-web.vercel.app` now aliases Vercel READY Flutter static preview `dpl_5gUPwPLd5VBUAuiHr1bMxKz8xHMD` built from squash commit `c10c104` with cloud-API origin, Supabase publishable key and pairing UI. HTTP GET returned 200 for both `/` and `/flutter_bootstrap.js`. **Previous Web alias**: `dpl_2Q5Uxyi9MWSym7x5U2kNf1X1nQee`.
+- **Android:** main push CI `45642608489` PASS, produced `fleetluma-android-debug-apk` but that regular workflow's default is emulator `10.0.2.2` (NOT the phone acceptance build). Install **cloud-configured APK** `fleetluma-integrated-cloud-android-debug-apk` from workflow run `45640481543`, artifact `15036165190`. Source `107e3d5` and merged main share the same verified Git tree. Artifact is a debug/demo build, not a signed Play Store release.
+- **Real monitoring:** owned service `FleetLuma API (demo target)`, workspace-scoped in database, checked every minute by Vault-authenticated Supabase Edge worker. Live query observed 22 checks in the hour, 20 HEALTHY 200, with experimental failed results honestly preserved. The latest observed 15:17 UTC record was `HEALTHY 200`, `354.79 ms`. Independent 15-minute retention job continues running.
+- **Final status:** physical Web + Android user acceptance remains **NOT PERFORMED** by ChatGPT. This chat runtime cannot control the operator's Android phone or browser session, and cannot verify signed-in rendered service graphs remotely. Execute the one final manual scenario below with real account and both devices. Do not mark those checks Done until observed.
+- **Rollback**: reassign `fleetluma-api.vercel.app` to prior API deployment ID and `fleetluma-web.vercel.app` to prior Web deployment ID using the Vercel account. Retention and independent checker need no rollback unless unexpected failures occur.
+
 ## Release identity
 
 - Source branch: `feat/saturday-cascade-integrated` / draft PR #69
