@@ -68,6 +68,15 @@
 - A successful Vercel build confirms packaging but not end-to-end runtime health, backend secret availability or database privileges. An unauthenticated web fetch of its `/health` endpoint was unavailable from the current environment; verify with trusted authenticated deployment inspection and the final user acceptance.
 - The last validated PostgreSQL alert lifecycle regression passed in GitHub Actions at `192f997934a4e38ddfb55d79447445302236351a`. After the latest docs-only and review-only SQL changes, rerun all CI gates on the exact final head commit.
 
+## Implementation update - named checker auth and automated regression guard
+- Supabase Edge Function `fleetluma-checker` updated from v2 to **v3**, deployed with `verify_jwt=false` and an explicit `withSupabase({auth:'secret:fleetluma-checker'})` guard. The gateway no longer expects a user/JWT credential; the handler requires the specifically named Supabase secret API key on `apikey`. A gateway flag set to false **without** the wrapper would be unsafe, so they are versioned together.
+- `supabase/config.toml` captures the required per-function gateway setting. This is a **service-to-service** endpoint, never a public monitoring API.
+- The Cron preflight and REVIEW-ONLY SQL use a single Vault-backed named key `fleetluma_checker_api_key`; actual scheduling remains commented out. Latest authoritative guide: `docs/deployment/SATURDAY_HTTP_CHECKER_ACTIVATION.md`.
+- Added `backend/tests/test_checker_release_guards.py` so Python CI detects removal of the named-key guard, the explicit probe opt-in switch, approved host validation, and accidental uncommenting of Cron schedule SQL.
+- **Still disabled**: no named key/secret provisioned, no Cron, no egress approval, no service enable, and no persisted check. Do not treat deployed `ACTIVE` Edge function status as active probing. Live `main` API/Web aliases and existing Android remain unchanged.
+- Security status: DNS prevalidation followed by `fetch(hostname)` is subject to a DNS-to-connect race. Do not activate general URL probing without outbound egress control, independent of CI status.
+- GitHub Actions for commit `f1a7129a63a0fe980795f7d9691f55b224b12994` started; full CI acceptance remains pending on this exact revision.
+
 ## Explicit deferrals
 - General process termination/kill and remote command execution are NOT in Saturday release. A safe proof of concept would need a separate narrowly authorized command architecture and agent changes.
 - Native PDF exports and public signup are NOT in Saturday release.
