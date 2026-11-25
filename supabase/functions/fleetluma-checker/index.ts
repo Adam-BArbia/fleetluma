@@ -20,7 +20,10 @@ Deno.serve(async (request) => {
   if (cronSecret.length < 32 || !equalsSecret(request.headers.get("x-fleetluma-cron") ?? "", cronSecret)) {
     return respond(401, { error: "Not authorized" });
   }
-  const databaseUrl = Deno.env.get("FLEETLUMA_DB_URL") ?? "";
+  // Supabase injects SUPABASE_DB_URL into hosted Edge Functions.
+  // An explicit restricted pooler DSN still takes priority when configured.
+  const databaseUrl = Deno.env.get("FLEETLUMA_DB_URL") ??
+    Deno.env.get("SUPABASE_DB_URL") ?? "";
   const hosts = (Deno.env.get("FLEETLUMA_CHECK_ALLOWED_HOSTS") ?? "")
     .split(",").map((x) => x.trim().toLowerCase()).filter(Boolean);
   if (!databaseUrl || hosts.length === 0 || Deno.env.get("FLEETLUMA_PUBLIC_PROBES_ENABLED") !== "true") {
