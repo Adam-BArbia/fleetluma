@@ -104,6 +104,13 @@
 - Artifacts are **not final user-accepted releases** and should not be installed before the matching integrated FastAPI Web/API backend is staged/promoted. Production Vercel aliases remain unchanged.
 - GitHub Actions run URL: https://github.com/Adam-BArbia/fleetluma/actions/runs/45596159643
 
+## Implementation update — browser startup regression and alert rule edits (2026-11-25)
+- FL-22 now has a real Playwright regression script `.github/scripts/web_boot_smoke.cjs` and GitHub Actions workflow `.github/workflows/web-browser-smoke.yml`. The job compiles real cloud-configured Flutter Web, launches 5 fresh Chromium and 5 fresh Firefox sessions, validates the Flutter first-frame event and hidden boot overlay, checks reload, and verifies a failed bootstrap visibly presents a recovery message.
+- The first browser job failed **before testing** because Playwright 1.56.1 does not support the GitHub ubuntu-latest 26.04 runner. The workflow was pinned to `ubuntu-24.04`. Follow-up run **45599863787 succeeded**, so all ten browser launches and script-failure recovery passed headless CI. This does not replace a physical final user test or prove all intermittent field conditions.
+- FL-34 alert editing now retires a prior active incident whenever an existing threshold or debounce requirement changes; the evaluation counter resets so a new incident must meet the new rule's consecutive-sample requirement. A real PostgreSQL integration regression was added. Alert runtime and UI flags remain OFF on production.
+- Latest source with these fixes: `5a51ceb6e2e03bf0e9845cee35e06ae08dca2b2a`. Browser smoke, backend, checker, PostgreSQL integration, PlantUML, preview contract, and Flutter Web CI passed on that commit; Android and cloud candidate jobs must be checked separately before final sign-off.
+- Non-production integrated FastAPI preview deployment for prior source SHA `6a82de9834a31bef6fe05a10affeb915214e339b` is READY at `https://fleetluma-42yd3zu4g-fleet-luma.vercel.app`. Preview runtime authentication/health still needs accepted browser verification; production API alias remains unchanged.
+
 ## Explicit deferrals
 - General process termination/kill and remote command execution are NOT in Saturday release. A safe proof of concept would need a separate narrowly authorized command architecture and agent changes.
 - Native PDF exports and public signup are NOT in Saturday release.
