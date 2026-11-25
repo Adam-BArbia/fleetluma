@@ -28,18 +28,73 @@ const supabasePublishableKey = String.fromEnvironment(
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   if (cloudMode) {
-    if (!apiBaseUrl.startsWith('https://') ||
-        !supabaseUrl.startsWith('https://') ||
-        supabasePublishableKey.isEmpty) {
-      throw StateError('Cloud mode requires HTTPS API, Supabase URL and publishable key');
+    try {
+      if (!apiBaseUrl.startsWith('https://') ||
+          !supabaseUrl.startsWith('https://') ||
+          supabasePublishableKey.isEmpty) {
+        throw StateError('Invalid cloud startup configuration');
+      }
+      await Supabase.initialize(
+        url: supabaseUrl,
+        publishableKey: supabasePublishableKey,
+        debug: false,
+      );
+    } catch (error) {
+      // Never render a blank page if cloud initialization fails before runApp.
+      // Do not print credentials, request bodies or provider error messages.
+      debugPrint('FleetLuma cloud startup failed: ${error.runtimeType}');
+      runApp(const FleetLumaStartupFailure());
+      return;
     }
-    await Supabase.initialize(
-      url: supabaseUrl,
-      publishableKey: supabasePublishableKey,
-      debug: false,
-    );
   }
   runApp(const FleetLumaApp());
+}
+
+/// Non-sensitive, actionable error UI for failures before Supabase is ready.
+/// This widget has no backend requests and cannot bypass operator approval.
+class FleetLumaStartupFailure extends StatelessWidget {
+  const FleetLumaStartupFailure({super.key});
+
+  @override
+  Widget build(BuildContext context) => MaterialApp(
+        title: 'FleetLuma - unavailable',
+        debugShowCheckedModeBanner: false,
+        theme: ThemeData.dark(useMaterial3: true),
+        home: Scaffold(
+          backgroundColor: const Color(0xFF080E1A),
+          body: SafeArea(
+            child: Center(
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 440),
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: const [
+                      Icon(Icons.cloud_off_outlined,
+                          size: 48, color: Color(0xFFFF8D95)),
+                      SizedBox(height: 22),
+                      Text('FleetLuma could not start',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                              fontSize: 25, fontWeight: FontWeight.w700)),
+                      SizedBox(height: 12),
+                      Text(
+                        'The monitoring dashboard is temporarily unavailable. '
+                        'Check your connection and reload the page. '
+                        'If the problem continues, contact the administrator.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                            height: 1.5, color: Color(0xFFA1AFCA)),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
 }
 
 class FleetLumaApp extends StatelessWidget {
