@@ -47,6 +47,11 @@
 - Safe deployment gates still pending: verify public IPv4-only DNS from Edge and enforce network egress against rebinding, configure function secret/allowlist and approved Cron invoker without revealing credentials, then observe real persisted checks before enabling service and marking the feature complete.
 - Existing Vercel release aliases, Android installed build and `main` have not been modified.
 
+## Implementation update - hardened authenticated UI
+- On failed authenticated refresh, Web host process snapshots, historical chart samples, HTTP service lists/check history, and alert-rule/incident collections now clear previously cached values rather than leaving them visible as current. Retry messages remain sanitized. This is especially important across session expiry and authorization changes.
+- One deliberately disabled API health target and Edge checker v2 are provisioned; no scheduled traffic or fabricated HTTP health samples.
+- Latest integrated source before this checkpoint: `87de016ff1feb97a907e3f98e047ba3ce09c910d`. Automated checks must pass for the next final source commit before production promotion.
+
 ## Explicit deferrals
 - General process termination/kill and remote command execution are NOT in Saturday release. A safe proof of concept would need a separate narrowly authorized command architecture and agent changes.
 - Native PDF exports and public signup are NOT in Saturday release.
