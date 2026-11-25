@@ -224,7 +224,16 @@ class AlertStore:
               UPDATE fleetluma.alert_rule_state
               SET consecutive_breaches=0,updated_at=now() WHERE rule_id=%s
             """, (row["id"],))
-            if not enabled:
+            # An active incident belongs to the previous rule configuration.
+            # Close it when the threshold/debounce changes as well as when the
+            # rule is disabled. Otherwise a new threshold inherits an old
+            # incident and bypasses its consecutive-sample requirement.
+            materially_changed = (
+                float(row["threshold_pct"]) != float(threshold)
+                or row["consecutive_required"] != required
+                or not enabled
+            )
+            if materially_changed:
                 self._close_incident(cur, row["id"], "ARCHIVED")
             return updated
 
