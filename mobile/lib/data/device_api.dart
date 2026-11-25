@@ -79,6 +79,7 @@ abstract class FleetDeviceApi {
   Future<void> deny(String pairingId);
   Future<List<ManagedDevice>> hosts(String workspaceId);
   Future<void> revoke(String hostId);
+  Future<void> rename(String hostId, String newName);
 }
 
 class HttpFleetDeviceApi implements FleetDeviceApi {
@@ -195,6 +196,16 @@ class HttpFleetDeviceApi implements FleetDeviceApi {
     return (result['items'] as List)
       .map((e) => ManagedDevice.fromJson(Map<String, dynamic>.from(e as Map)))
       .toList(growable: false);
+  }
+
+  @override
+  Future<void> rename(String hostId, String newName) async {
+    final normalized = newName.trim();
+    if (normalized.length < 2 || normalized.length > 64) {
+      throw const FormatException('Device name must be 2–64 characters.');
+    }
+    await _request('PATCH', 'hosts/${Uri.encodeComponent(hostId)}',
+        body: {'name': normalized});
   }
 
   @override
