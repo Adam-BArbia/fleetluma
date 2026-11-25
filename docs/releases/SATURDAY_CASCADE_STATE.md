@@ -26,14 +26,16 @@
 - Existing Android package and stable Web/API preview aliases have not been changed.
 - Pending: integrated Flutter/backend CI, narrow correction passes, HTTP function security/deployment, real paired-device checks, review/apply alert migration to non-production only before enabling the optional alerts subsystem, and final user-style test.
 
-## Remaining implementation cascade
-1. Fix all CI failures on integrated branch. Revisit first-frame shell behavior, caching, Flutter analyzer and auth.
-2. Match Figma Inter typography (source shows Inter, actual native font files not bundled yet); use consistent semantic typography, not guess exact token measurements.
-3. Add downloadable authenticated CSV of real samples, 15m/1h/24h, with formula-injection defense and no credentials.
-4. Activate/configure the approved cloud HTTP checker only after FL-29 / FL-31 security and secrets checks; real scheduled values are mandatory before marking HTTP done.
-5. Validate agent pairing, rename, revoke, host/process/history workspace isolation and cloud/APK compatibility.
-6. Add scoped alert rules and incidents only if core is stable. Design: evaluator on authenticated incoming metric reports; no new cron for CPU threshold. Prevent duplicate incidents and enforce ownership.
-7. Refresh UML/API architecture and Jira based on implementation. Rehearse the single final manual journey.
+## Remaining implementation cascade (current status)
+
+1. **Done in source**: FL-22 safe cloud-startup fallback and Web boot shell; diagnose actual intermittent white screen in the final browser acceptance.
+2. **Done in source**: Figma Inter font selection through Google Fonts 8.2.1; verify offline/fallback visual behavior in final browser acceptance.
+3. **Done in source**: authenticated Web-only Top 10 process explorer, genuine CPU/RAM/disk history and CSV export.
+4. **Done in source**: device rename via protected PATCH, alongside existing pair/approve/revoke screens; final physical device/tenant authorization test still needed.
+5. **Done in source, default OFF**: alert rule CRUD, transactional sample thresholds, OPEN/ACKNOWLEDGED/RESOLVED incident lifecycle, backend and Web tests, private additive FL-40 schema. Migration NOT applied; flags NOT enabled.
+6. **Pending infrastructure**: cloud HTTP checker authorization and secrets, strict public-host allowlist and DNS/egress control, Supabase cron/pg_net/Vault activation, one real persisted check and retention verification. Source now supports default `SUPABASE_DB_URL` in Edge Functions; see `docs/deployment/SATURDAY_HTTP_CHECKER_ACTIVATION.md`.
+7. **Pending release**: exact integrated CI status, merge/release approval gates, stable Web and Android artifact, final single user-style Web+Android acceptance. No live production deployment claimed.
+8. **Traceability**: Jira FL-33 (CSV), FL-34 (alerts), FL-35 (rename) created, plus FL-22/26/29/30 updated. UML 33/34 and final acceptance script added.
 
 ## Explicit deferrals
 - General process termination/kill and remote command execution are NOT in Saturday release. A safe proof of concept would need a separate narrowly authorized command architecture and agent changes.
