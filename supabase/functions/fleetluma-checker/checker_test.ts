@@ -70,14 +70,20 @@ Deno.test("Private, metadata and special IPv4 addresses are rejected", () => {
   assertEquals(isPublicIpv4("8.8.8.8"), true);
 });
 
-Deno.test("Public DNS verification rejects private and IPv6 answers", async () => {
+Deno.test("Public DNS validates all IPv4 answers and safely permits dual-stack hosts", async () => {
   const target = allowedTarget("https://status.example.test/", allowed);
-  assertEquals(await verifyPublicDns(target, async (_hostname, family) =>
-    family === "A" ? ["8.8.8.8"] : []), "8.8.8.8");
-  await assertRejects(() => verifyPublicDns(target, async (_hostname, family) =>
-    family === "A" ? ["127.0.0.1"] : []));
-  await assertRejects(() => verifyPublicDns(target, async (_hostname, family) =>
-    family === "A" ? ["8.8.8.8"] : ["::1"]));
+  let ipv6Requested = false;
+  assertEquals(await verifyPublicDns(target, async (_hostname, family) => {
+    if (family === "AAAA") {
+      ipv6Requested = true;
+      return ["::1"];
+    }
+    return ["8.8.8.8"];
+  }), "8.8.8.8");
+  assertEquals(ipv6Requested, false);
+  await assertRejects(() => verifyPublicDns(target, async () => ["127.0.0.1"]));
+  await assertRejects(() => verifyPublicDns(target, async () => ["8.8.8.8", "192.168.1.2"]));
+  await assertRejects(() => verifyPublicDns(target, async () => []));
 });
 
 
