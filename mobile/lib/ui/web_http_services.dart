@@ -278,7 +278,9 @@ class _ServiceCardState extends State<_ServiceCard> {
   void didUpdateWidget(covariant _ServiceCard oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.service.id != widget.service.id ||
-        !identical(oldWidget.api, widget.api)) _load();
+        !identical(oldWidget.api, widget.api)) {
+      _load();
+    }
   }
 
   @override
