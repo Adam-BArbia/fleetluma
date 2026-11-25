@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../models/host_snapshot.dart';
 import '../data/fleet_api.dart';
 import 'web_host_history.dart';
+import 'web_host_processes.dart';
 import '../state/fleet_controller.dart';
 
 // Web-only presentation dashboard. Uses the existing authenticated poller.
@@ -343,6 +344,12 @@ class WebFleetOverview extends StatelessWidget {
           if (state.api is HttpFleetApi)
             WebHostHistoryCharts(
               key: ValueKey('history-' + host.id),
+              api: state.api as HttpFleetApi,
+              hostId: host.id,
+            ),
+          if (state.api is HttpFleetApi)
+            WebHostProcesses(
+              key: ValueKey('processes-' + host.id),
               api: state.api as HttpFleetApi,
               hostId: host.id,
             ),
