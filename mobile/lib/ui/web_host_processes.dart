@@ -161,6 +161,7 @@ class _WebHostProcessesState extends State<WebHostProcesses> {
       if (!mounted || generation != _generation) return;
       setState(() {
         _loading = false;
+        _snapshot = null;
         _error = 'Process snapshot unavailable. Retry later.';
       });
     }
