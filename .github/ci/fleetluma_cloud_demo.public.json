@@ -1,0 +1,7 @@
+{
+  "FLEETLUMA_CLOUD_MODE": "true",
+  "FLEETLUMA_PAIRING_UI_ENABLED": "true",
+  "FLEETLUMA_API_BASE_URL": "https://fleetluma-api.vercel.app",
+  "FLEETLUMA_SUPABASE_URL": "https://mulsyhgdigonccziywet.supabase.co",
+  "FLEETLUMA_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_CqkNcqehVZ0Wqm0SjofI2A_k1xB3Ntl"
+}
