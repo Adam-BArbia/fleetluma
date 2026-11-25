@@ -77,6 +77,12 @@
 - Security status: DNS prevalidation followed by `fetch(hostname)` is subject to a DNS-to-connect race. Do not activate general URL probing without outbound egress control, independent of CI status.
 - GitHub Actions for commit `f1a7129a63a0fe980795f7d9691f55b224b12994` started; full CI acceptance remains pending on this exact revision.
 
+## Implementation update - scheduler extension prerequisites
+- **Live Supabase migration applied successfully:** `fleetluma_fl29_scheduler_extensions_only` installed `pg_cron` 1.6.4 and `pg_net` 0.20.4 in the **FleetLuma** project. Vault was already installed under actual extension name `supabase_vault` 0.3.2 (previous searches mistakenly looked for extension `vault`).
+- No Cron job was created. Read-back verified **0** job names beginning `fleetluma`. No real HTTP probe was triggered, and the known FleetLuma API service row remains disabled.
+- The exact additive SQL is versioned in `backend/sql/FL-29_scheduler_extensions.sql`, and the activation runbook is updated. This unblocks the infrastructure prerequisite **only**; the named secret key, Vault secret value, outbound egress/DNS-to-connect policy, single successful check and scheduling approval remain outstanding.
+- Final source revision before this ledger update: `6aaaee7b443adaef2a7a569b442222537a29587f`; inspect exact-head CI before final build sign-off.
+
 ## Explicit deferrals
 - General process termination/kill and remote command execution are NOT in Saturday release. A safe proof of concept would need a separate narrowly authorized command architecture and agent changes.
 - Native PDF exports and public signup are NOT in Saturday release.
