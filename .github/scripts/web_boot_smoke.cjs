@@ -12,8 +12,6 @@ const { chromium, firefox } = require(
 const BASE_URL = process.env.FLEETLUMA_SMOKE_URL || 'http://127.0.0.1:8088/';
 const ARTIFACTS = path.resolve(process.cwd(), 'test-results/web-startup');
 
-const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
-
 async function capture(page, browserName, iteration, error, events) {
   await fs.mkdir(ARTIFACTS, { recursive: true });
   const prefix = `${browserName}-${iteration}`;
@@ -45,7 +43,7 @@ async function checkFirstFrame(browser, name, iteration) {
   });
   page.on('pageerror', e => events.push({ type: 'pageerror', error: String(e).slice(0, 240) }));
   page.on('response', r => {
-    if (/\\.(?:js|wasm)$/.test(new URL(r.url()).pathname) && r.status() >= 400) {
+    if (/\.(?:js|wasm)$/.test(new URL(r.url()).pathname) && r.status() >= 400) {
       events.push({ type: 'asset', status: r.status(), path: new URL(r.url()).pathname });
     }
   });
@@ -67,7 +65,7 @@ async function checkFirstFrame(browser, name, iteration) {
         document.querySelector('flutter-view, flt-glass-pane') !== null,
         null, { timeout: 45000 });
     }
-    process.stdout.write(`PASS ${name} cold start ${iteration}/5 + first frame\\n`);
+    process.stdout.write(`PASS ${name} cold start ${iteration}/5 + first frame\n`);
   } catch (error) {
     await capture(page, name, iteration, error, events);
     throw error;
@@ -88,7 +86,7 @@ async function checkScriptRecovery(browser, name) {
     if (!text?.includes('could not finish loading')) {
       throw new Error('Missing visible startup recovery guidance');
     }
-    process.stdout.write(`PASS ${name} failed script displays recovery instead of white page\\n`);
+    process.stdout.write(`PASS ${name} failed script displays recovery instead of white page\n`);
   } catch (error) {
     await capture(page, name, 'broken-bootstrap', error, []);
     throw error;
