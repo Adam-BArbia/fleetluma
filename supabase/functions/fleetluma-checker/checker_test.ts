@@ -101,7 +101,7 @@ Deno.test("TLS request uses exactly the verified IP and preserves HTTPS hostname
     Object.defineProperty(socket, "remoteAddress", { value: "8.8.8.8" });
     request.end = (() => {
       request.emit("socket", socket);
-      socket.emit("connect");
+      (socket as EventEmitter).emit("connect");
       const response = {
         statusCode: 204,
         destroy() { /* no response body consumed */ },
@@ -123,7 +123,7 @@ Deno.test("TLS request uses exactly the verified IP and preserves HTTPS hostname
   assertEquals(options?.agent, false);
   assertEquals(options?.method, "GET");
   assertEquals(options?.path, "/health");
-  assertEquals(options?.headers?.["Host"], "status.example.test");
+  assertEquals((options?.headers as Record<string, string> | undefined)?.["Host"], "status.example.test");
   const lookup = options?.lookup;
   if (typeof lookup !== "function") throw new Error("IP-pinning lookup missing");
   let resolved = "";
