@@ -37,6 +37,16 @@
 7. **Pending release**: exact integrated CI status, merge/release approval gates, stable Web and Android artifact, final single user-style Web+Android acceptance. No live production deployment claimed.
 8. **Traceability**: Jira FL-33 (CSV), FL-34 (alerts), FL-35 (rename) created, plus FL-22/26/29/30 updated. UML 33/34 and final acceptance script added.
 
+## Implementation update - 2026-11-25 cloud staging
+- **Supabase FleetLuma project** `mulsyhgdigonccziywet`: `fleetluma-checker` Edge Function deployed as **version 2** with `verify_jwt=true`. The function requires a separate high-entropy `x-fleetluma-cron` secret, explicit hostname allowlist and `FLEETLUMA_PUBLIC_PROBES_ENABLED=true`. None have been configured through this change. **Active deployment does NOT mean active probing.**
+- **One owned API health destination registered, disabled**: `FleetLuma API (demo target)` at `https://fleetluma-api.vercel.app/health`, `enabled=false`. Vercel project `fleetluma-api` owns this domain and has no SSO/password protection. HTTP reachability from the Edge runtime still requires proof.
+- **No HTTP samples yet**: `service_checks=0`; no Cron configured or executed; the Web UI correctly shows the disabled/never-checked state. `pg_cron`/`pg_net`/`vault` extensions remain absent.
+- Checker hardening: 3xx redirects are now `UNHEALTHY` rather than successful, with a regression test; manual redirects are not followed. The Edge Function version 2 includes this code.
+- Web freshness: the latency-history tile refreshes when the parent observes a newly persisted check timestamp.
+- Full integrated CI at source revision `ee9a970172a7a888bdd3f9556ec8a41da5c2b653` passed all seven GitHub Actions workflows, including mobile APK artifact and backend tests; later revisions require their own final CI pass.
+- Safe deployment gates still pending: verify public IPv4-only DNS from Edge and enforce network egress against rebinding, configure function secret/allowlist and approved Cron invoker without revealing credentials, then observe real persisted checks before enabling service and marking the feature complete.
+- Existing Vercel release aliases, Android installed build and `main` have not been modified.
+
 ## Explicit deferrals
 - General process termination/kill and remote command execution are NOT in Saturday release. A safe proof of concept would need a separate narrowly authorized command architecture and agent changes.
 - Native PDF exports and public signup are NOT in Saturday release.
