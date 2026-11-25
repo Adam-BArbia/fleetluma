@@ -1,3 +1,5 @@
+import { request as httpsRequest } from "node:https";
+
 /** Pure validation/probing for scheduled public HTTP endpoint checks. */
 export type CheckResult = {
   checked_at: string;
@@ -80,7 +82,7 @@ export async function verifyPublicDns(
   target: URL,
   resolver: (hostname: string, family: "A" | "AAAA") => Promise<string[]> =
     async (hostname, family) => Deno.resolveDns(hostname, family),
-): Promise<void> {
+): Promise<string> {
   // Fail closed if the resolver is disabled / cannot inspect addresses.
   const ipv4 = await resolver(target.hostname, "A");
   const ipv6 = await resolver(target.hostname, "AAAA");
@@ -88,4 +90,100 @@ export async function verifyPublicDns(
       ipv4.some((address) => !isPublicIpv4(address))) {
     throw new Error("Public IPv4-only DNS verification failed");
   }
+  // Return the verified IP. The TLS connection must not re-resolve the host.
+  return ipv4[0];
+}
+
+/**
+ * Safe HTTPS status probe, pinning the connection to a prevalidated public IP.
+ * Node's TLS client retains hostname-based SNI/certificate verification;
+ * lookup never resolves the hostname again. No redirects or response bodies.
+ */
+export async function probePinned(
+  rawUrl: string,
+  allowedHosts: Set<string>,
+  verifiedIp: string,
+  requester: typeof httpsRequest = httpsRequest,
+): Promise<CheckResult> {
+  const url = allowedTarget(rawUrl, allowedHosts);
+  if (!isPublicIpv4(verifiedIp)) {
+    throw new Error("Refusing a non-public pinned destination");
+  }
+  const started = performance.now();
+  const checked_at = new Date().toISOString();
+  return await new Promise<CheckResult>((resolve) => {
+    let settled = false;
+    let timedOut = false;
+    let request: ReturnType<typeof httpsRequest> | undefined;
+    const finish = (
+      status: number | null,
+      failure: CheckResult["failure_kind"],
+    ) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(deadline);
+      const healthy = status !== null && status >= 200 && status < 300;
+      resolve({
+        checked_at,
+        status: healthy ? "HEALTHY" : "UNHEALTHY",
+        http_code: status,
+        latency_ms: status === null ? null :
+          Math.max(0, Math.round((performance.now() - started) * 100) / 100),
+        failure_kind: healthy ? "none" :
+          status === null ? failure : "http_error",
+      });
+    };
+    const deadline = setTimeout(() => {
+      timedOut = true;
+      request?.destroy(new Error("Checker request deadline reached"));
+      finish(null, "timeout");
+    }, 4000);
+    try {
+      request = requester({
+        hostname: url.hostname,
+        servername: url.hostname,
+        port: 443,
+        method: "GET",
+        path: url.pathname,
+        agent: false,
+        rejectUnauthorized: true,
+        timeout: 4000,
+        headers: {
+          "Host": url.hostname,
+          "User-Agent": "FleetLuma-Checker/0.1",
+          "Connection": "close",
+          "Accept": "*/*",
+        },
+        lookup: (hostname, _options, callback) => {
+          if (hostname.toLowerCase() !== url.hostname) {
+            callback(new Error("Unapproved DNS hostname"));
+            return;
+          }
+          callback(null, verifiedIp, 4);
+        },
+      }, (response) => {
+        const code = response.statusCode;
+        response.destroy();
+        finish(typeof code === "number" && code >= 100 && code <= 599
+          ? code : null, "network_error");
+      });
+      request.on("socket", (socket) => {
+        socket.once("connect", () => {
+          if (socket.remoteAddress !== verifiedIp) {
+            request?.destroy(new Error("Connected IP differs from verified IP"));
+          }
+        });
+      });
+      request.on("timeout", () => {
+        timedOut = true;
+        request?.destroy(new Error("Checker request timed out"));
+      });
+      request.on("error", () =>
+        finish(null, timedOut ? "timeout" : "network_error"));
+      request.end();
+    } catch {
+      request?.destroy();
+      finish(null, "network_error");
+    }
+  });
 }
