@@ -1,4 +1,5 @@
-/** FL-19: non-public Supabase Edge Function invoked only by authenticated Cron. */
+/** FL-19: restricted Supabase Edge Function invoked by named-key Cron only. */
+import { withSupabase } from "npm:@supabase/server@1.9.2";
 import postgres from "npm:postgres@3.4.7";
 import { allowedTarget, probe, verifyPublicDns } from "./checker.ts";
 
@@ -7,19 +8,16 @@ const respond = (status: number, body: object) =>
     status, headers: { "Content-Type": "application/json" },
   });
 
-function equalsSecret(a: string, b: string): boolean {
-  if (!a || !b || a.length !== b.length) return false;
-  let different = 0;
-  for (let i = 0; i < a.length; i++) different |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  return different === 0;
-}
-
-Deno.serve(async (request) => {
-  if (request.method !== "POST") return respond(405, { error: "Method not allowed" });
-  const cronSecret = Deno.env.get("FLEETLUMA_CRON_SECRET") ?? "";
-  if (cronSecret.length < 32 || !equalsSecret(request.headers.get("x-fleetluma-cron") ?? "", cronSecret)) {
-    return respond(401, { error: "Not authorized" });
-  }
+// Service-to-service caller authentication is enforced by the Supabase
+// wrapper: ONLY the named secret key "fleetluma-checker" can call this worker.
+// Hosted configuration MUST set verify_jwt=false for apikey-secret mode.
+// The secret is supplied on apikey, never in the function source or URL.
+// No anonymous access: auth:'secret:<name>' fails closed before this handler.
+export default {
+  fetch: withSupabase({ auth: "secret:fleetluma-checker" }, async (request) => {
+    if (request.method !== "POST") {
+      return respond(405, { error: "Method not allowed" });
+    }
   // Supabase injects SUPABASE_DB_URL into hosted Edge Functions.
   // An explicit restricted pooler DSN still takes priority when configured.
   const databaseUrl = Deno.env.get("FLEETLUMA_DB_URL") ??
@@ -63,4 +61,5 @@ Deno.serve(async (request) => {
   } finally {
     await sql.end({ timeout: 3 });
   }
-});
+  }),
+};
