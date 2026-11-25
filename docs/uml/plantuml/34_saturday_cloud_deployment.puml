@@ -1,0 +1,41 @@
+@startuml
+title FleetLuma - Saturday demo cloud and client deployment
+skinparam componentStyle rectangle
+skinparam shadowing false
+skinparam backgroundColor white
+actor "Operator" as OP
+node "Windows / Linux host" {
+  component "Python psutil Agent\nbackground service" as AG
+}
+node "Android phone" {
+  component "Flutter Android APK\nexisting minimal UI" as AP
+}
+cloud "Vercel" {
+  component "Flutter Web static app\nrich dashboard / Inter" as WEB
+  component "FastAPI Python function\nJWT + agent bearer auth" as API
+}
+cloud "Supabase" {
+  database "Private PostgreSQL\nhosts / metrics / processes\nservices / checks\nworkspaces / pairing\nalert tables [staged]" as DB
+  component "Supabase Auth" as AUTH
+  component "Scheduled checker\nEdge Function [NOT YET ACTIVE]" as CHECK
+  component "pg_cron / pg_net\n[NOT YET ENABLED]" as CRON
+}
+cloud "Approved public HTTPS endpoints" as TARGET
+
+OP --> AP
+OP --> WEB
+AG --> API : HTTPS / reports & pairing
+AP --> API : HTTPS / JWT
+WEB --> API : HTTPS / JWT
+AP --> AUTH : operator sign-in
+WEB --> AUTH : operator sign-in
+API --> DB : TLS private pooler
+CRON ..> CHECK : schedule [planned]
+CHECK ..> TARGET : allowlisted HTTPS [planned]
+CHECK ..> DB : persist checks [planned]
+note bottom of CHECK
+  Live service_checks rows = 0 at Nov 25 inspection.
+  Do not claim checker is operational until
+  secrets, SSRF controls and Cron pass.
+end note
+@enduml
