@@ -97,6 +97,13 @@
 - Artifacts are **debug/preview candidates**, not released or signed general-availability packages. Until API/Web source from PR #69 is promoted, richer UI features may not be supported by the currently released backend; do not present any cloud candidate as end-to-end accepted.
 - At creation, cloud candidate workflow run `45596159643` was in progress. Inspect its final conclusion and upload artifacts at the exact source SHA before sharing with the operator.
 
+## Verified integrated cloud artifacts (2026-11-25)
+- Exact source SHA `82f044d9315aedc2f2ca2e96d503e3db604430e9` passed **all eight** GitHub Actions workflows: PostgreSQL integration, backend tests, Flutter mobile tests, Flutter Web build, cloud preview contract, PlantUML validation, scheduled checker tests, and cloud candidate build.
+- Cloud candidate run `45596159643` **SUCCESS**, with Android debug APK artifact `15012784717` (`fleetluma-integrated-cloud-android-debug-apk`, ~80.3MB ZIP transport size) and Web release ZIP artifact `15014555103` (`fleetluma-integrated-cloud-web-candidate`, ~14.3MB ZIP transport size).
+- These two artifacts embed **only** the public Supabase publishable API key and the actual HTTPS API and Supabase origins, built from the same code revision. This fixes the older CI Android APK's emulator-only 10.0.2.2 configuration.
+- Artifacts are **not final user-accepted releases** and should not be installed before the matching integrated FastAPI Web/API backend is staged/promoted. Production Vercel aliases remain unchanged.
+- GitHub Actions run URL: https://github.com/Adam-BArbia/fleetluma/actions/runs/45596159643
+
 ## Explicit deferrals
 - General process termination/kill and remote command execution are NOT in Saturday release. A safe proof of concept would need a separate narrowly authorized command architecture and agent changes.
 - Native PDF exports and public signup are NOT in Saturday release.
