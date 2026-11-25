@@ -1,7 +1,7 @@
 /** FL-19: restricted Supabase Edge Function invoked by named-key Cron only. */
 import { withSupabase } from "npm:@supabase/server@1.9.2";
 import postgres from "npm:postgres@3.4.7";
-import { allowedTarget, probe, verifyPublicDns } from "./checker.ts";
+import { allowedTarget, probePinned, verifyPublicDns } from "./checker.ts";
 
 const respond = (status: number, body: object) =>
   new Response(JSON.stringify(body), {
@@ -39,8 +39,9 @@ export default {
     for (const service of services) {
       try {
         const target = allowedTarget(service.url, allowed);
-        await verifyPublicDns(target);
-        const result = await probe(service.url, allowed);
+        const verifiedIp = await verifyPublicDns(target);
+        // IP-pinned HTTPS with original hostname SNI + cert verification.
+        const result = await probePinned(service.url, allowed, verifiedIp);
         await sql`INSERT INTO fleetluma.service_checks
           (service_id, checked_at, status, http_code, latency_ms, failure_kind)
           VALUES
@@ -52,9 +53,8 @@ export default {
         skipped++;
       }
     }
-    // Enforce 24-hour maximum history for the demo, independently of API requests.
-    await sql`DELETE FROM fleetluma.samples WHERE received_at < NOW() - INTERVAL '24 hours'`;
-    await sql`DELETE FROM fleetluma.service_checks WHERE checked_at < NOW() - INTERVAL '24 hours'`;
+    // FL-36: independent pg_cron retention runs without a network request.
+    // Do not couple retention to the optional HTTP checker lifecycle.
     return respond(200, { checked, skipped });
   } catch (_err) {
     return respond(500, { error: "Scheduled checker unavailable" });
