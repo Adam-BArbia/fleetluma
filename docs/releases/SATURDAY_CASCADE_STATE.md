@@ -21,6 +21,8 @@
 - Selected Figma Inter through `google_fonts` 8.2.1; actual Inter font files are not bundled and first-use network fetching/offline resilience remains a final acceptance gate.
 - Added `backend/sql/FL-40_alert_rules.sql` **STAGED ONLY**, `backend/fleetluma_backend/alerts.py`, feature-gated cloud routes + report-time evaluator, pure threshold transition tests, and an optional Web incident/rule UI. Both `FLEETLUMA_ALERTS_ENABLED` (API) and `FLEETLUMA_ALERTS_UI_ENABLED` (Web compile-time) default OFF.
 - **Live Supabase read-only inspection**: the FleetLuma database has 4 host rows, 0 monitored services, 0 HTTP check rows, 0 Edge Functions, and no `pg_cron`/`pg_net`/`vault` extensions currently installed. Do not represent HTTP monitoring as operational.
+- Device management Update gap closed: `HttpFleetDeviceApi.rename()` calls the existing protected PATCH /api/v1/operator/hosts/{id}; Manage Devices now exposes a rename dialog and widget coverage. No agent/auth/DB contract changes.
+- Added PlantUML deployment and alert-lifecycle diagrams, plus `docs/releases/SATURDAY_FINAL_ACCEPTANCE.md` for the operator's one final manual user-style test.
 - Existing Android package and stable Web/API preview aliases have not been changed.
 - Pending: integrated Flutter/backend CI, narrow correction passes, HTTP function security/deployment, real paired-device checks, review/apply alert migration to non-production only before enabling the optional alerts subsystem, and final user-style test.
 
