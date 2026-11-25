@@ -174,25 +174,25 @@ class _WebAlertsPanelState extends State<WebAlertsPanel> {
   }
 
   Future<void> _edit(Map<String,dynamic> rule) async {
-    final input=TextEditingController(
-      text:(rule['threshold_pct'] as num).toString());
+    var editedThreshold = (rule['threshold_pct'] as num).toString();
     final next=await showDialog<double>(context:context,
       builder:(ctx) => AlertDialog(
         title:const Text('Edit threshold'),
-        content:TextField(controller:input,
+        content:TextFormField(
+          initialValue:editedThreshold,
+          onChanged:(value) => editedThreshold=value,
           decoration:const InputDecoration(labelText:'Threshold %'),
           keyboardType:const TextInputType.numberWithOptions(decimal:true)),
         actions:[
           TextButton(onPressed:()=>Navigator.pop(ctx),
             child:const Text('Cancel')),
           FilledButton(onPressed:(){
-            final value=double.tryParse(input.text.trim());
+            final value=double.tryParse(editedThreshold.trim());
             if(value == null || value < 1 || value > 100)return;
             Navigator.pop(ctx,value);
           },child:const Text('Save')),
         ],
       ));
-    input.dispose();
     if(next == null)return;
     await _write(() async {
       await alertRequest(widget.api,'PATCH',
