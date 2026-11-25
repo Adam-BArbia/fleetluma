@@ -211,6 +211,7 @@ class _WebServiceHealthOverviewState extends State<WebServiceHealthOverview> {
       if (!mounted || sequence != _generation) return;
       setState(() {
         _error = 'HTTP monitoring unavailable. Try refreshing.';
+        _services = const [];
         _loading = false;
       });
     }
@@ -304,6 +305,7 @@ class _ServiceCardState extends State<_ServiceCard> {
       if (!mounted || sequence != _generation) return;
       setState(() {
         _loading = false;
+        _checks = const [];
         _error = 'Check history unavailable.';
       });
     }
