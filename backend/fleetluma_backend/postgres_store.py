@@ -113,6 +113,10 @@ class PostgresStore:
                     """, (host_id, sampled_at, Jsonb(processes)))
                 cur.execute("UPDATE fleetluma.hosts SET last_seen_at=%s WHERE id=%s",
                             (received_at, host_id))
+                if os.environ.get("FLEETLUMA_ALERTS_ENABLED") == "true":
+                    # Same transaction: rejected agent reports never open incidents.
+                    from .alerts import evaluate_host_report
+                    evaluate_host_report(cur, host_id, metrics, received_at)
         return {"host_id": str(host_id), "received_at": iso(received_at), "status": "accepted"}
 
     def _serialize_host(self, conn, host):
