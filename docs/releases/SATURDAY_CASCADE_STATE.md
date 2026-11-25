@@ -90,6 +90,13 @@
 - Supabase security advisor now reports additional informational `rls_enabled_no_policy` notices for these four tables. This is expected for the deliberately private, server-only FleetLuma schema with no public Data API grants; do not create broad authenticated RLS policies merely to silence the warning.
 - Schema migration is recorded in Supabase migrations, distinct from the no-job scheduler extension migration; preserve both records for traceability.
 
+## Cloud candidate artifacts (2026-11-25)
+- Created `.github/ci/fleetluma_cloud_demo.public.json`, containing **only** the public FleetLuma Supabase publishable key and exact HTTPS API/Auth origins. No database password, agent credential, server secret, service-role key or Vercel token is embedded.
+- Added isolated `.github/workflows/cloud-candidate-artifacts.yml` to build **both** Flutter Android debug APK and Flutter Web release from the **same** integration commit, passing `--dart-define-from-file`. It validates the public key's expected prefix, exact approved domains and the absence of extra environment fields, then runs `flutter analyze` and `flutter test`.
+- This corrects the normal Android CI artifact's local emulator `10.0.2.2` default: the integrated cloud candidate targets `https://fleetluma-api.vercel.app` and the existing FleetLuma Supabase Auth project. The Web candidate is a ZIP artifact only, not a Vercel deployment.
+- Artifacts are **debug/preview candidates**, not released or signed general-availability packages. Until API/Web source from PR #69 is promoted, richer UI features may not be supported by the currently released backend; do not present any cloud candidate as end-to-end accepted.
+- At creation, cloud candidate workflow run `45596159643` was in progress. Inspect its final conclusion and upload artifacts at the exact source SHA before sharing with the operator.
+
 ## Explicit deferrals
 - General process termination/kill and remote command execution are NOT in Saturday release. A safe proof of concept would need a separate narrowly authorized command architecture and agent changes.
 - Native PDF exports and public signup are NOT in Saturday release.
