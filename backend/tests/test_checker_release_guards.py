@@ -32,11 +32,21 @@ def test_probe_cannot_activate_without_explicit_approval_flags():
     assert "enabled=true" in source
     assert "verifyPublicDns(target)" in source
     assert "allowedTarget(service.url, allowed)" in source
-    assert "probePinned(service.url, allowed, verifiedIp)" in source
+    assert "probePinnedNative(service.url, allowed, verifiedIp)" in source
+    assert "await probePinned(service.url" not in source
     assert "const verifiedIp = await verifyPublicDns(target)" in source
     assert "await probe(service.url" not in source
     checker = (PROJECT / "supabase" / "functions" /
                "fleetluma-checker" / "checker.ts").read_text(encoding="utf-8")
+    # The active implementation must connect directly to verified public IPv4
+    # and upgrade that specific socket with strict hostname TLS validation.
+    native = (PROJECT / "supabase" / "functions" /
+              "fleetluma-checker" / "deno_probe.ts").read_text(encoding="utf-8")
+    assert "Deno.connect({ hostname: verifiedIp, port: 443 })" in native
+    assert "Deno.startTls(tcp, { hostname: target.hostname })" in native
+    assert 'redirect:' not in native
+    # Older Node helper is kept for unit test compatibility but never invoked
+    # from the live checker.
     assert "rejectUnauthorized: true" in checker
     assert "serverName:" not in checker
     assert "servername: url.hostname" in checker
