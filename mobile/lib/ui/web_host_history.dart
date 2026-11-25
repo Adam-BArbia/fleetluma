@@ -7,6 +7,8 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
 import '../data/fleet_api.dart';
+import '../util/csv_report.dart';
+import '../util/download_csv.dart';
 
 // Authenticated historical samples. No synthetic/seeded chart values.
 class HostHistoryPoint {
@@ -170,6 +172,21 @@ class _WebHostHistoryChartsState extends State<WebHostHistoryCharts> {
     }
   }
 
+  void _exportCsv() {
+    final now = DateTime.now().toUtc();
+    final start = now.subtract(historyWindow(window));
+    final selected = points.where((sample) =>
+        !sample.time.isBefore(start) && !sample.time.isAfter(now))
+        .toList(growable: false);
+    if (selected.isEmpty) return;
+    final safeId = widget.hostId.replaceAll(RegExp(r'[^a-zA-Z0-9_-]'), '_');
+    downloadCsv(
+      'fleetluma-' + safeId + '-' + window + '.csv',
+      makeHostHistoryCsv(
+        hostId: widget.hostId, window: window, samples: selected),
+    );
+  }
+
   void _select(String next) {
     if (window == next) return;
     setState(() {
@@ -214,6 +231,11 @@ class _WebHostHistoryChartsState extends State<WebHostHistoryCharts> {
               ),
             ),
           ),
+        IconButton(
+          tooltip: 'Export recorded samples as CSV',
+          onPressed: points.isEmpty ? null : _exportCsv,
+          icon: const Icon(Icons.download_rounded, size: 18),
+        ),
       ]),
       const SizedBox(height: 9),
       if (error != null) Text(error!, style: const TextStyle(
