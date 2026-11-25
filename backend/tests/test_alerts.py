@@ -36,7 +36,8 @@ def test_invalid_thresholds_fail_closed():
         RuleEdit(consecutive_required=9)
 
 
-def test_router_rejects_unauthenticated_operator():
+def test_router_rejects_unauthenticated_operator(monkeypatch):
+    monkeypatch.setenv("FLEETLUMA_MODE", "cloud")
     app = FastAPI()
     app.include_router(make_alert_router(store_factory=lambda: object()))
     with TestClient(app) as client:
